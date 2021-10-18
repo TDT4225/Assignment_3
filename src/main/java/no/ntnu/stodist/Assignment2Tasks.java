@@ -1,5 +1,6 @@
 package no.ntnu.stodist;
 
+import com.mongodb.Block;
 import com.mongodb.DB;
 import com.mongodb.DBCallback;
 import com.mongodb.DBCollection;
@@ -17,6 +18,11 @@ import no.ntnu.stodist.simpleTable.Column;
 import no.ntnu.stodist.simpleTable.SimpleTable;
 import org.bson.conversions.Bson;
 
+import java.util.Arrays;
+import org.bson.Document;
+import org.bson.BsonNull;
+
+import javax.print.Doc;
 import java.io.File;
 import java.io.IOException;
 import java.sql.*;
@@ -31,6 +37,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 public class Assignment2Tasks {
 
@@ -179,21 +186,37 @@ public class Assignment2Tasks {
 
     }
 
-    public static void task2(Connection connection) throws SQLException {
-        String query = """
-                       SELECT AVG(t.activity_count) AS avg, MIN(t.activity_count) AS min, MAX(t.activity_count) AS max
-                       FROM (
-                            SELECT u.id, COUNT(a.user_id) AS activity_count
-                            FROM user u
-                            LEFT JOIN activity AS a ON u.id = a.user_id
-                            GROUP BY u.id
-                            ) AS t    
-                       """;
-        ResultSet   resultSet   = connection.createStatement().executeQuery(query);
-        SimpleTable simpleTable = makeResultSetTable(resultSet);
-        simpleTable.setTitle("Task 2");
-        simpleTable.display();
+    public static void task2(MongoDatabase db) throws SQLException {
+        var activityCollection = db.getCollection(Activity.collection);
+        var userCollection = db.getCollection(User.collection);
+        var trackPointCollection = db.getCollection(TrackPoint.collection);
 
+        var agr = Arrays.asList(new Document("$project",
+                                   new Document("num_activities",
+                                                new Document("$size", "$activities"))),
+                      new Document("$group",
+                                   new Document("_id",
+                                                new BsonNull())
+                                           .append("avg",
+                                                   new Document("$avg", "$num_activities"))
+                                           .append("min",
+                                                   new Document("$min", "$num_activities"))
+                                           .append("max",
+                                                   new Document("$max", "$num_activities"))));
+
+        var aggregate = userCollection.aggregate(agr);
+        Document document = aggregate.iterator().next();
+        double avg = document.getDouble("avg");
+        int max = document.getInteger("max");
+        int min = document.getInteger("min");
+
+        System.out.printf("""
+                          ### task 2 ###
+                          num avg = %s
+                          num max = %s
+                          num min = %s
+                          \n
+                          """, avg,max,min);
 
     }
 
