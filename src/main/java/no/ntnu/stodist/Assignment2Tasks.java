@@ -468,23 +468,44 @@ public class Assignment2Tasks {
         simpleTable.display();
 
     }
-//
-//
-//    public static void task8(MongoDatabase db) {
-//        var activityCollection   = db.getCollection(Activity.collection);
-//        var userCollection       = db.getCollection(User.collection);
-//        var trackPointCollection = db.getCollection(TrackPoint.collection);
-//        String query = """
-//                       SELECT transportation_mode, COUNT(DISTINCT user_id)
-//                       FROM activity
-//                       WHERE transportation_mode IS NOT NULL
-//                       GROUP BY transportation_mode;
-//                       """;
-//        ResultSet                 resultSet   = connection.createStatement().executeQuery(query);
-//        SimpleTable<List<String>> simpleTable = makeResultSetTable(resultSet);
-//        simpleTable.setTitle("Task 8");
-//        simpleTable.display();
-//    }
+
+
+    public static void task8(MongoDatabase db) {
+        var activityCollection   = db.getCollection(Activity.collection);
+        var userCollection       = db.getCollection(User.collection);
+        var trackPointCollection = db.getCollection(TrackPoint.collection);
+        String query = """
+                       SELECT transportation_mode, COUNT(DISTINCT user_id)
+                       FROM activity
+                       WHERE transportation_mode IS NOT NULL
+                       GROUP BY transportation_mode;
+                       """;
+        var agr = Arrays.asList(new Document("$group",
+                                             new Document("_id",
+                                                          new Document("transportationMode", "$transportationMode")
+                                                                  .append("user_id", "$user_id"))
+                                                     .append("cnt",
+                                                             new Document("$count",
+                                                                          new Document()))),
+                                new Document("$group",
+                                             new Document("_id", "$_id.transportationMode")
+                                                     .append("cnt",
+                                                             new Document("$count",
+                                                                          new Document()))));
+
+        Iterator<Document> documents = activityCollection.aggregate(agr).iterator();
+
+
+        SimpleTable<Document> simpleTable = new SimpleTable<>();
+        simpleTable.setTitle("Task 8");
+        simpleTable.setItems(documents);
+        simpleTable.setCols(
+                new Column<Document>("transportation type",document -> document.getString("_id")),
+                new Column<Document>("num",document -> document.getInteger("cnt"))
+
+        );
+        simpleTable.display();
+    }
 //
 //    private static void task9a(MongoDatabase db) {
 //        var activityCollection   = db.getCollection(Activity.collection);
