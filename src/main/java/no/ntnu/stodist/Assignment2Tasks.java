@@ -4,6 +4,7 @@ import com.mongodb.Block;
 import com.mongodb.DB;
 import com.mongodb.DBCallback;
 import com.mongodb.DBCollection;
+import com.mongodb.client.AggregateIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Accumulators;
@@ -34,9 +35,14 @@ import java.time.chrono.ChronoPeriod;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.Temporal;
+import java.util.Date;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static java.util.OptionalInt.empty;
+
 public class Assignment2Tasks {
 
 
@@ -125,6 +131,8 @@ public class Assignment2Tasks {
             user.getActivities().forEach(activity -> {
                 trackPointCollection.insertMany(activity.getTrackPoints().stream().map(t -> t.toDocument(activity.getId())).toList());
                 activityCollection.insertOne(activity.toDocument(user.getId()));
+
+                //activityCollection.insertOne(activity.toDnormDocument(user.getId()));
             });
             userCollection.insertOne(user.toDocument());
         });
@@ -213,10 +221,34 @@ public class Assignment2Tasks {
         simpleTable.display();
     }
 
-    public static void task4(MongoDatabase db) throws SQLException {
+    public static void task4(MongoDatabase db) {
         var activityCollection   = db.getCollection(Activity.collection);
         var userCollection       = db.getCollection(User.collection);
         var trackPointCollection = db.getCollection(TrackPoint.collection);
+
+        /*
+        db.activity.aggregate([
+            {
+                $addFields: {
+                    days_over: {
+                        $dateDiff:{
+                            startDate: "$startDateTime",
+                            endDate: "$endDateTime",
+                            unit: "day"
+                        }
+                    }
+                }
+            },
+            {
+                $match: {
+                    days_over: {$gte: 0}
+                }
+            },
+            {
+                $count: "days_over"
+            }
+        ])
+         */
 
         var agr = Arrays.asList(new Document("$addFields",
                                              new Document("days_over",
@@ -240,7 +272,10 @@ public class Assignment2Tasks {
 
     }
 
-    public static void task5(Connection connection) throws SQLException {
+    public static void task5(MongoDatabase db) {
+        var activityCollection   = db.getCollection(Activity.collection);
+        var userCollection       = db.getCollection(User.collection);
+        var trackPointCollection = db.getCollection(TrackPoint.collection);
         String query = """
                        SELECT a.id AS duplicate_asignment_ids
                        FROM activity AS a,
@@ -254,40 +289,153 @@ public class Assignment2Tasks {
                        AND  a.start_date_time = f.start_date_time
                        AND a.end_date_time = f.end_date_time;
                        """;
-        ResultSet resultSet = connection.createStatement().executeQuery(query);
-        resultSet.next();
+                /*
+        db.activity.aggregate(
+        [{
+            $group: {
+                _id: {
+                    startDateT: "$startDateTime",
+                    edt: "$endDateTime",
+                    uid: "$user_id"
+                },
+                count: {
+                    $count: {}
+                },
+                ids: {
+                    $addToSet: "$_id"
+                }
+            }
+        }, {
+            $match: {
 
-        if (! resultSet.next()) {
+                count: {
+                    $gt: 1
+                }
+
+            }
+        }]
+        )
+         */
+
+        var agr = Arrays.asList(new Document("$group",
+                                             new Document("_id",
+                                                          new Document("startDateT", "$startDateTime")
+                                                                  .append("edt", "$endDateTime")
+                                                                  .append("uid", "$user_id"))
+                                                     .append("count",
+                                                             new Document("$count",
+                                                                          new Document()))
+                                                     .append("ids",
+                                                             new Document("$addToSet", "$_id"))),
+                                new Document("$match",
+                                             new Document("count",
+                                                          new Document("$gt", 1L))));
+
+        Iterator<Document> documents = activityCollection.aggregate(agr).iterator();
+
+
+        if (! documents.hasNext()) {
             System.out.println("Task 5");
             System.out.println("no results");
         } else {
-            SimpleTable simpleTable = makeResultSetTable(resultSet);
+            SimpleTable<Document> simpleTable = new SimpleTable<>();
             simpleTable.setTitle("Task 5");
+            simpleTable.setItems(documents);
+            simpleTable.setCols(
+                    new Column<Document>("id",document -> document.getInteger("_id"))
+            );
             simpleTable.display();
         }
     }
 
-    public static void task6(Connection connection) throws SQLException {
-        String query = """
-                       WITH tps AS (
-                           SELECT user_id, activity_id,tp.id AS act_id, lat, lon, date_time
-                           FROM activity a
-                                    JOIN track_point tp
-                                         ON a.id = tp.activity_id)
-                       SELECT DISTINCT tps.user_id AS user_1, tps2.user_id AS user_2
-                       FROM tps
-                       INNER JOIN tps AS tps2
-                       ON tps.user_id != tps2.user_id
-                       AND SECOND(ABS(TIMEDIFF(tps.date_time, tps2.date_time))) <= 60
-                       AND ST_DISTANCE(POINT(tps.lat, tps.lon), POINT(tps2.lat, tps2.lon)) <= 100;                    
-                       """;
-        ResultSet   resultSet   = connection.createStatement().executeQuery(query);
-        SimpleTable simpleTable = makeResultSetTable(resultSet);
+    public static void task6(MongoDatabase db) {
+        /*
+        noe som heter geo near finnes men siden implementasjonen er fucking stupid så kan den ikke
+        brukes uten og endre hvordan data er lagret til MongoDB sitt BS format
+
+
+
+[{$addFields: {
+"seconds_dif": {
+                $abs:{
+                    $dateDiff:{
+                        startDate: ISODate("2008-08-24T15:38:00"),
+                        endDate: "$dateTime",
+                        unit: "second"
+                    }
+                }
+            }}}, {$match: {
+  "seconds_dif": {$lte: 60}
+}}]
+
+
+         */
+
+
+
+        var activityCollection   = db.getCollection(Activity.collection);
+        var userCollection       = db.getCollection(User.collection);
+        var trackPointCollection = db.getCollection(TrackPoint.collection);
+
+
+        var agr = Arrays.asList(new Document("$addFields",
+                                            new Document("seconds_dif",
+                                                         new Document("$abs",
+                                                                      new Document("$dateDiff",
+                                                                                   new Document("startDate", Date.from(Instant.parse("2008-08-24T15:38:00Z")))
+                                                                                           .append("endDate", "$dateTime")
+                                                                                           .append("unit", "second"))))),
+                               new Document("$match",
+                                            new Document("seconds_dif",
+                                                         new Document("$lte", 60L))));
+
+        Iterator<Document> itr = trackPointCollection.find().iterator();
+        ArrayList<Document> tpDocuments = new ArrayList<>();
+
+        itr.forEachRemaining(tpDocuments::add);
+
+        double target_lat = 39.97548;
+        double target_lon = 116.33031;
+
+
+        List<Integer> toCloseIds = tpDocuments.parallelStream().map(document -> {
+            double kmDist = haversineDistance(document.getDouble("latitude"),target_lat, document.getDouble("longitude"), target_lon);
+            double mDist = kmDist * 1000;
+            if (mDist <= 100){
+                return OptionalInt.of(document.getInteger("activity_id"));
+            } else {
+                return empty();
+            }
+        }).filter(OptionalInt::isPresent).map(OptionalInt::getAsInt).distinct().toList();
+
+
+        var infectedUsersFilter = Arrays.asList(new Document("$match",
+                                                              new Document("_id",
+                                                                           new Document("$in", toCloseIds))),
+                                                 new Document("$group",
+                                                              new Document("_id", "$user_id")),
+                                                new Document("$sort",
+                                                             new Document("_id", 1L)));
+
+        var infectedUsers = activityCollection.aggregate(infectedUsersFilter).iterator();
+
+
+        SimpleTable<Document> simpleTable = new SimpleTable<>();
         simpleTable.setTitle("Task 6");
+        simpleTable.setItems(infectedUsers);
+        simpleTable.setCols(
+                new Column<Document>("infected users",document -> document.getInteger("_id"))
+        );
         simpleTable.display();
+
+
+
     }
 
-    public static void task7(Connection connection) throws SQLException {
+    public static void task7(MongoDatabase db) {
+        var activityCollection   = db.getCollection(Activity.collection);
+        var userCollection       = db.getCollection(User.collection);
+        var trackPointCollection = db.getCollection(TrackPoint.collection);
 
 
         String query = """
@@ -300,210 +448,242 @@ public class Assignment2Tasks {
                                                FROM activity
                                                WHERE transportation_mode = 'taxi') AS c);
                        """;
-        ResultSet   resultSet   = connection.createStatement().executeQuery(query);
-        SimpleTable simpleTable = makeResultSetTable(resultSet);
+        var agr = Arrays.asList(new Document("$match",
+                                             new Document("transportationMode",
+                                                          new Document("$not",
+                                                                       new Document("$in", Arrays.asList("taxi"))))),
+                                new Document("$group",
+                                             new Document("_id", "$user_id")),
+                                new Document("$count", "num_users"));
+
+        Iterator<Document> documents = activityCollection.aggregate(agr).iterator();
+
+
+        SimpleTable<Document> simpleTable = new SimpleTable<>();
         simpleTable.setTitle("Task 7");
-        simpleTable.display();
-
-    }
-
-
-    public static void task8(Connection connection) throws SQLException {
-        String query = """
-                       SELECT transportation_mode, COUNT(DISTINCT user_id)
-                       FROM activity
-                       WHERE transportation_mode IS NOT NULL
-                       GROUP BY transportation_mode;        
-                       """;
-        ResultSet                 resultSet   = connection.createStatement().executeQuery(query);
-        SimpleTable<List<String>> simpleTable = makeResultSetTable(resultSet);
-        simpleTable.setTitle("Task 8");
-        simpleTable.display();
-    }
-
-    private static void task9a(Connection connection) throws SQLException {
-        String query = """
-                       SELECT COUNT(*) AS num_activites, YEAR(activity.start_date_time) AS year, MONTH(activity.start_date_time) AS month
-                       FROM activity
-                       GROUP BY year, month
-                       ORDER BY num_activities DESC
-                       LIMIT 1;
-                       """;
-        ResultSet                 resultSet   = connection.createStatement().executeQuery(query);
-        SimpleTable<List<String>> simpleTable = makeResultSetTable(resultSet);
-        simpleTable.setTitle("Task 9a");
-        simpleTable.display();
-    }
-
-    private static void task9b(Connection connection) throws SQLException {
-        String query = """
-                       SELECT COUNT(a.user_id) AS num_activities, a.user_id, SUM(TIMEDIFF(a.end_date_time,a.start_date_time)) AS time_spent
-                       FROM
-                            activity AS a,
-                            (SELECT COUNT(*) AS num_activites, YEAR(activity.start_date_time) AS year, MONTH(activity.start_date_time) AS month
-                             FROM activity
-                             GROUP BY year, month
-                             ORDER BY num_activities DESC
-                             LIMIT 1) AS best_t
-                       WHERE YEAR(a.start_date_time) = best_t.year
-                       AND MONTH(a.start_date_time) = best_t.month
-                       GROUP BY user_id
-                       ORDER BY COUNT(a.user_id) DESC
-                       LIMIT 2;
-                       """;
-        ResultSet                 resultSet   = connection.createStatement().executeQuery(query);
-        SimpleTable<List<String>> simpleTable = makeResultSetTable(resultSet);
-        simpleTable.setTitle("Task 9b");
-        simpleTable.display();
-
-        List<List<String>> tabelData = simpleTable.getItems();
-
-        var timeSpentTop    = Duration.ofSeconds(Long.parseLong(tabelData.get(0).get(2)));
-        var timeSpentSecond = Duration.ofSeconds(Long.parseLong(tabelData.get(1).get(2)));
-
-        int dif = timeSpentTop.compareTo(timeSpentSecond);
-        if (dif > 0) {
-            System.out.printf(
-                    "the user with the most activities, user: %s spent more time activitying than the user with the second most activities\n",
-                    tabelData.get(0).get(0)
-            );
-        } else if (dif < 0) {
-            System.out.printf(
-                    "the user with the next most activities, user: %s spent more time activitying than the user with the second most activities\n",
-                    tabelData.get(1).get(0)
-            );
-        } else {
-            System.out.println("the top and next top users spent the same time activitying");
-        }
-
-        System.out.printf("user: %-4s with most activities spent     : Hours: %-3s Min: %-2s Sec: %s\n",
-                          tabelData.get(0).get(0),
-                          timeSpentTop.toHours(),
-                          timeSpentTop.minusHours(timeSpentTop.toHours()).toMinutes(),
-                          timeSpentTop.minusMinutes(timeSpentTop.toMinutes())
-                                      .toSeconds()
+        simpleTable.setItems(documents);
+        simpleTable.setCols(
+                new Column<Document>("non taxi users",document -> document.getInteger("num_users"))
         );
-        System.out.printf("user: %-4s with next most activities spent: Hours: %-3s Min: %-2s Sec: %s\n",
-                          tabelData.get(1).get(0),
-                          timeSpentSecond.toHours(),
-                          timeSpentSecond.minusHours(timeSpentSecond.toHours()).toMinutes(),
-                          timeSpentSecond.minusMinutes(timeSpentSecond.toMinutes())
-                                         .toSeconds()
-        );
-
-
-    }
-
-    public static void task9(Connection connection) throws SQLException {
-        task9a(connection);
-        task9b(connection);
-    }
-
-    public static void task10(Connection connection) throws SQLException {
-        String query = """
-                       SELECT tp.*
-                       FROM (SELECT * FROM user WHERE user.id = 113) AS u # we use 113 instead of 112 because the indexes are shifted
-                       INNER JOIN (
-                           SELECT *
-                           FROM activity
-                           WHERE YEAR(start_date_time) = 2008
-                           AND transportation_mode = 'walk'
-                           ) a
-                       ON u.id = a.user_id
-                       INNER JOIN track_point tp
-                       ON a.id = tp.activity_id
-                       """;
-        ResultSet resultSet = connection.createStatement().executeQuery(query);
-
-        HashMap<Integer, Activity> activities = new HashMap<>();
-
-        while (resultSet.next()) {
-            TrackPoint trackPoint = new TrackPoint();
-            trackPoint.setLatitude(resultSet.getDouble(3));
-            trackPoint.setLongitude(resultSet.getDouble(4));
-
-            int activityId = resultSet.getInt(2);
-            if (! activities.containsKey(activityId)) {
-                activities.put(activityId, new Activity(activityId));
-            }
-            Activity parentAct = activities.get(activityId);
-            parentAct.getTrackPoints().add(trackPoint);
-        }
-
-        double totDist = activities.values().stream().parallel().map(activity -> {
-            TrackPoint keep = null;
-            double     roll = 0;
-            for (TrackPoint trackPoint : activity.getTrackPoints()) {
-                if (keep == null) {
-                    keep = trackPoint;
-                    continue;
-                }
-                roll += haversineDistance(trackPoint.getLatitude(),
-                                           keep.getLatitude(),
-                                           trackPoint.getLongitude(),
-                                           keep.getLongitude()
-                );
-                keep = trackPoint;
-
-            }
-            return roll;
-        }).reduce(Double::sum).get();
-
-        System.out.println("\tTask 10");
-        System.out.printf("User 112 have in total walked %.3f km in 2008\n", totDist);
-
-    }
-
-    public static void task11(Connection connection) throws SQLException {
-        String query = """
-                       WITH delta_alt_tps AS (
-                           SELECT track_point.id, track_point.activity_id , LEAD(track_point.altitude) OVER (PARTITION BY track_point.activity_id ORDER BY id) - track_point.altitude AS delta_alt
-                           FROM track_point
-                           WHERE track_point.altitude != -777
-                           AND track_point.altitude IS NOT NULL
-                       ),
-                       delta_alt_act AS (
-                           SELECT delta_alt_tps.activity_id, SUM(IF(delta_alt_tps.delta_alt > 0, delta_alt_tps.delta_alt, 0)) AS altitude_gain
-                           FROM delta_alt_tps
-                           GROUP BY delta_alt_tps.activity_id)
-                       SELECT activity.user_id, (SUM(delta_alt_act.altitude_gain)/ 3.2808) AS user_altitude_gain_m
-                       FROM activity
-                                JOIN delta_alt_act ON activity.id = delta_alt_act.activity_id
-                       GROUP BY activity.user_id
-                       ORDER BY  user_altitude_gain_m DESC
-                       LIMIT 20;  
-                       """;
-        ResultSet   resultSet   = connection.createStatement().executeQuery(query);
-        SimpleTable simpleTable = makeResultSetTable(resultSet);
-        simpleTable.setTitle("Task 11");
         simpleTable.display();
-    }
 
-    public static void task12(Connection connection) throws SQLException {
-        String query = """
-                       WITH shifted_tps AS (
-                           SELECT
-                               track_point.activity_id,
-                               track_point.date_time,
-                               LEAD(track_point.date_time)
-                                   OVER (PARTITION BY track_point.activity_id ORDER BY track_point.id) AS shifted_time
-                           FROM
-                               track_point
-                       )
-                       SELECT activity.user_id, COUNT(*) AS num_invalid_activities
-                       FROM (
-                               SELECT shifted_tps.activity_id, MINUTE(TIMEDIFF(shifted_tps.date_time, shifted_tps.shifted_time)) AS td
-                               FROM shifted_tps
-                               WHERE MINUTE(TIMEDIFF(shifted_tps.date_time, shifted_tps.shifted_time)) > 5
-                       ) AS invalid_acts
-                       INNER JOIN activity
-                       ON invalid_acts.activity_id = activity.id
-                       GROUP BY activity.user_id
-                       ORDER BY num_invalid_activities DESC;
-                       """;
-        ResultSet   resultSet   = connection.createStatement().executeQuery(query);
-        SimpleTable simpleTable = makeResultSetTable(resultSet);
-        simpleTable.setTitle("Task 12");
-        simpleTable.display();
     }
+//
+//
+//    public static void task8(MongoDatabase db) {
+//        var activityCollection   = db.getCollection(Activity.collection);
+//        var userCollection       = db.getCollection(User.collection);
+//        var trackPointCollection = db.getCollection(TrackPoint.collection);
+//        String query = """
+//                       SELECT transportation_mode, COUNT(DISTINCT user_id)
+//                       FROM activity
+//                       WHERE transportation_mode IS NOT NULL
+//                       GROUP BY transportation_mode;
+//                       """;
+//        ResultSet                 resultSet   = connection.createStatement().executeQuery(query);
+//        SimpleTable<List<String>> simpleTable = makeResultSetTable(resultSet);
+//        simpleTable.setTitle("Task 8");
+//        simpleTable.display();
+//    }
+//
+//    private static void task9a(MongoDatabase db) {
+//        var activityCollection   = db.getCollection(Activity.collection);
+//        var userCollection       = db.getCollection(User.collection);
+//        var trackPointCollection = db.getCollection(TrackPoint.collection);
+//        String query = """
+//                       SELECT COUNT(*) AS num_activites, YEAR(activity.start_date_time) AS year, MONTH(activity.start_date_time) AS month
+//                       FROM activity
+//                       GROUP BY year, month
+//                       ORDER BY num_activities DESC
+//                       LIMIT 1;
+//                       """;
+//        ResultSet                 resultSet   = connection.createStatement().executeQuery(query);
+//        SimpleTable<List<String>> simpleTable = makeResultSetTable(resultSet);
+//        simpleTable.setTitle("Task 9a");
+//        simpleTable.display();
+//    }
+//
+//    private static void task9b(MongoDatabase db) {
+//        var activityCollection   = db.getCollection(Activity.collection);
+//        var userCollection       = db.getCollection(User.collection);
+//        var trackPointCollection = db.getCollection(TrackPoint.collection);
+//        String query = """
+//                       SELECT COUNT(a.user_id) AS num_activities, a.user_id, SUM(TIMEDIFF(a.end_date_time,a.start_date_time)) AS time_spent
+//                       FROM
+//                            activity AS a,
+//                            (SELECT COUNT(*) AS num_activites, YEAR(activity.start_date_time) AS year, MONTH(activity.start_date_time) AS month
+//                             FROM activity
+//                             GROUP BY year, month
+//                             ORDER BY num_activities DESC
+//                             LIMIT 1) AS best_t
+//                       WHERE YEAR(a.start_date_time) = best_t.year
+//                       AND MONTH(a.start_date_time) = best_t.month
+//                       GROUP BY user_id
+//                       ORDER BY COUNT(a.user_id) DESC
+//                       LIMIT 2;
+//                       """;
+//        ResultSet                 resultSet   = connection.createStatement().executeQuery(query);
+//        SimpleTable<List<String>> simpleTable = makeResultSetTable(resultSet);
+//        simpleTable.setTitle("Task 9b");
+//        simpleTable.display();
+//
+//        List<List<String>> tabelData = simpleTable.getItems();
+//
+//        var timeSpentTop    = Duration.ofSeconds(Long.parseLong(tabelData.get(0).get(2)));
+//        var timeSpentSecond = Duration.ofSeconds(Long.parseLong(tabelData.get(1).get(2)));
+//
+//        int dif = timeSpentTop.compareTo(timeSpentSecond);
+//        if (dif > 0) {
+//            System.out.printf(
+//                    "the user with the most activities, user: %s spent more time activitying than the user with the second most activities\n",
+//                    tabelData.get(0).get(0)
+//            );
+//        } else if (dif < 0) {
+//            System.out.printf(
+//                    "the user with the next most activities, user: %s spent more time activitying than the user with the second most activities\n",
+//                    tabelData.get(1).get(0)
+//            );
+//        } else {
+//            System.out.println("the top and next top users spent the same time activitying");
+//        }
+//
+//        System.out.printf("user: %-4s with most activities spent     : Hours: %-3s Min: %-2s Sec: %s\n",
+//                          tabelData.get(0).get(0),
+//                          timeSpentTop.toHours(),
+//                          timeSpentTop.minusHours(timeSpentTop.toHours()).toMinutes(),
+//                          timeSpentTop.minusMinutes(timeSpentTop.toMinutes())
+//                                      .toSeconds()
+//        );
+//        System.out.printf("user: %-4s with next most activities spent: Hours: %-3s Min: %-2s Sec: %s\n",
+//                          tabelData.get(1).get(0),
+//                          timeSpentSecond.toHours(),
+//                          timeSpentSecond.minusHours(timeSpentSecond.toHours()).toMinutes(),
+//                          timeSpentSecond.minusMinutes(timeSpentSecond.toMinutes())
+//                                         .toSeconds()
+//        );
+//
+//
+//    }
+//
+//    public static void task9(MongoDatabase db) {
+//        task9a(db);
+//        task9b(db);
+//    }
+//
+//    public static void task10(MongoDatabase db) {
+//        var activityCollection   = db.getCollection(Activity.collection);
+//        var userCollection       = db.getCollection(User.collection);
+//        var trackPointCollection = db.getCollection(TrackPoint.collection);
+//        String query = """
+//                       SELECT tp.*
+//                       FROM (SELECT * FROM user WHERE user.id = 113) AS u # we use 113 instead of 112 because the indexes are shifted
+//                       INNER JOIN (
+//                           SELECT *
+//                           FROM activity
+//                           WHERE YEAR(start_date_time) = 2008
+//                           AND transportation_mode = 'walk'
+//                           ) a
+//                       ON u.id = a.user_id
+//                       INNER JOIN track_point tp
+//                       ON a.id = tp.activity_id
+//                       """;
+//        ResultSet resultSet = connection.createStatement().executeQuery(query);
+//
+//        HashMap<Integer, Activity> activities = new HashMap<>();
+//
+//        while (resultSet.next()) {
+//            TrackPoint trackPoint = new TrackPoint();
+//            trackPoint.setLatitude(resultSet.getDouble(3));
+//            trackPoint.setLongitude(resultSet.getDouble(4));
+//
+//            int activityId = resultSet.getInt(2);
+//            if (! activities.containsKey(activityId)) {
+//                activities.put(activityId, new Activity(activityId));
+//            }
+//            Activity parentAct = activities.get(activityId);
+//            parentAct.getTrackPoints().add(trackPoint);
+//        }
+//
+//        double totDist = activities.values().stream().parallel().map(activity -> {
+//            TrackPoint keep = null;
+//            double     roll = 0;
+//            for (TrackPoint trackPoint : activity.getTrackPoints()) {
+//                if (keep == null) {
+//                    keep = trackPoint;
+//                    continue;
+//                }
+//                roll += haversineDistance(trackPoint.getLatitude(),
+//                                           keep.getLatitude(),
+//                                           trackPoint.getLongitude(),
+//                                           keep.getLongitude()
+//                );
+//                keep = trackPoint;
+//
+//            }
+//            return roll;
+//        }).reduce(Double::sum).get();
+//
+//        System.out.println("\tTask 10");
+//        System.out.printf("User 112 have in total walked %.3f km in 2008\n", totDist);
+//
+//    }
+//
+//    public static void task11(MongoDatabase db) {
+//        var activityCollection   = db.getCollection(Activity.collection);
+//        var userCollection       = db.getCollection(User.collection);
+//        var trackPointCollection = db.getCollection(TrackPoint.collection);
+//        String query = """
+//                       WITH delta_alt_tps AS (
+//                           SELECT track_point.id, track_point.activity_id , LEAD(track_point.altitude) OVER (PARTITION BY track_point.activity_id ORDER BY id) - track_point.altitude AS delta_alt
+//                           FROM track_point
+//                           WHERE track_point.altitude != -777
+//                           AND track_point.altitude IS NOT NULL
+//                       ),
+//                       delta_alt_act AS (
+//                           SELECT delta_alt_tps.activity_id, SUM(IF(delta_alt_tps.delta_alt > 0, delta_alt_tps.delta_alt, 0)) AS altitude_gain
+//                           FROM delta_alt_tps
+//                           GROUP BY delta_alt_tps.activity_id)
+//                       SELECT activity.user_id, (SUM(delta_alt_act.altitude_gain)/ 3.2808) AS user_altitude_gain_m
+//                       FROM activity
+//                                JOIN delta_alt_act ON activity.id = delta_alt_act.activity_id
+//                       GROUP BY activity.user_id
+//                       ORDER BY  user_altitude_gain_m DESC
+//                       LIMIT 20;
+//                       """;
+//        ResultSet   resultSet   = connection.createStatement().executeQuery(query);
+//        SimpleTable simpleTable = makeResultSetTable(resultSet);
+//        simpleTable.setTitle("Task 11");
+//        simpleTable.display();
+//    }
+//
+//    public static void task12(MongoDatabase db) {
+//        var activityCollection   = db.getCollection(Activity.collection);
+//        var userCollection       = db.getCollection(User.collection);
+//        var trackPointCollection = db.getCollection(TrackPoint.collection);
+//        String query = """
+//                       WITH shifted_tps AS (
+//                           SELECT
+//                               track_point.activity_id,
+//                               track_point.date_time,
+//                               LEAD(track_point.date_time)
+//                                   OVER (PARTITION BY track_point.activity_id ORDER BY track_point.id) AS shifted_time
+//                           FROM
+//                               track_point
+//                       )
+//                       SELECT activity.user_id, COUNT(*) AS num_invalid_activities
+//                       FROM (
+//                               SELECT shifted_tps.activity_id, MINUTE(TIMEDIFF(shifted_tps.date_time, shifted_tps.shifted_time)) AS td
+//                               FROM shifted_tps
+//                               WHERE MINUTE(TIMEDIFF(shifted_tps.date_time, shifted_tps.shifted_time)) > 5
+//                       ) AS invalid_acts
+//                       INNER JOIN activity
+//                       ON invalid_acts.activity_id = activity.id
+//                       GROUP BY activity.user_id
+//                       ORDER BY num_invalid_activities DESC;
+//                       """;
+//        ResultSet   resultSet   = connection.createStatement().executeQuery(query);
+//        SimpleTable simpleTable = makeResultSetTable(resultSet);
+//        simpleTable.setTitle("Task 12");
+//        simpleTable.display();
+//    }
 }
