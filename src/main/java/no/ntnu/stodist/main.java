@@ -16,9 +16,9 @@ public class main {
             MongoDatabase db = db_connection.getMongoConnection();
             //Assignment2Tasks.insertData(db);
             //Assignment2Tasks.task1(db);
-            Assignment2Tasks.task2(db);
-            //            Assignment2Tasks.task3(connection);
-            //            Assignment2Tasks.task4(connection);
+            //Assignment2Tasks.task2(db);
+            //Assignment2Tasks.task3(db);
+            Assignment2Tasks.task4(db);
             //            Assignment2Tasks.task5(connection);
             //Assignment2Tasks.task6(connection);
             //            Assignment2Tasks.task7(connection);

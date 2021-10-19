@@ -18,7 +18,8 @@ import no.ntnu.stodist.simpleTable.Column;
 import no.ntnu.stodist.simpleTable.SimpleTable;
 import org.bson.conversions.Bson;
 
-import java.util.Arrays;
+import java.util.*;
+
 import org.bson.Document;
 import org.bson.BsonNull;
 
@@ -33,9 +34,6 @@ import java.time.chrono.ChronoPeriod;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.Temporal;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -131,40 +129,11 @@ public class Assignment2Tasks {
             userCollection.insertOne(user.toDocument());
         });
     }
-
     private static SimpleTable<List<String>> makeResultSetTable(ResultSet resultSet) throws SQLException {
-        SimpleTable<List<String>> simpleTable = new SimpleTable<>();
-
-        ResultSetMetaData metaData = resultSet.getMetaData();
-
-        List<List<String>> tabelData = new ArrayList<>();
-        List<String>       headerRow = new ArrayList<>();
-        for (int i = 1; i <= metaData.getColumnCount(); i++) {
-            headerRow.add(metaData.getColumnLabel(i));
-        }
-
-        while (resultSet.next()) {
-            List<String> rowData = new ArrayList<>();
-            for (int i = 1; i <= metaData.getColumnCount(); i++) {
-                rowData.add(resultSet.getString(i));
-            }
-            tabelData.add(rowData);
-
-        }
-
-        List<Column<List<String>>> tabelCols = new ArrayList<>();
-        for (int i = 0; i < headerRow.size(); i++) {
-            int finalI = i;
-            tabelCols.add(new Column<>(headerRow.get(i), row -> row.get(finalI)));
-        }
-
-        simpleTable.getCols().addAll(tabelCols);
-        simpleTable.setTopPaddingLines(1);
-        simpleTable.setItems(tabelData);
-        return simpleTable;
-
-
+    return null;
     }
+
+
 
     public static void task1(MongoDatabase db) throws SQLException {
         var activityCollection = db.getCollection(Activity.collection);
@@ -186,7 +155,7 @@ public class Assignment2Tasks {
 
     }
 
-    public static void task2(MongoDatabase db) throws SQLException {
+    public static void task2(MongoDatabase db) {
         var activityCollection = db.getCollection(Activity.collection);
         var userCollection = db.getCollection(User.collection);
         var trackPointCollection = db.getCollection(TrackPoint.collection);
@@ -220,31 +189,53 @@ public class Assignment2Tasks {
 
     }
 
-    public static void task3(Connection connection) throws SQLException {
-        String query = """
-                       SELECT user_id, COUNT(user_id) AS num_activities
-                       FROM activity
-                       GROUP BY user_id
-                       ORDER BY num_activities DESC 
-                       LIMIT 10
-                       """;
-        ResultSet   resultSet   = connection.createStatement().executeQuery(query);
-        SimpleTable simpleTable = makeResultSetTable(resultSet);
+    public static void task3(MongoDatabase db) {
+        var activityCollection   = db.getCollection(Activity.collection);
+        var userCollection       = db.getCollection(User.collection);
+        var trackPointCollection = db.getCollection(TrackPoint.collection);
+
+        var agr = Arrays.asList(new Document("$project",
+                                             new Document("num_activities",
+                                                          new Document("$size", "$activities"))),
+                                new Document("$sort",
+                                             new Document("num_activities", -1L)),
+                                new Document("$limit", 10L));
+
+        Iterator<Document> documents = userCollection.aggregate(agr).iterator();
+
+        SimpleTable<Document> simpleTable = new SimpleTable<>();
         simpleTable.setTitle("Task 3");
+        simpleTable.setItems(documents);
+        simpleTable.setCols(
+                new Column<Document>("id",document -> document.getInteger("_id")),
+                new Column<Document>("num activities",document -> document.getInteger("num_activities"))
+        );
         simpleTable.display();
     }
 
-    public static void task4(Connection connection) throws SQLException {
-        String query = """
-                       SELECT COUNT(DISTINCT c.user_id) AS num_users
-                       FROM(SELECT user_id
-                            FROM activity
-                            WHERE DATEDIFF(end_date_time, start_date_time) = 1) AS c
-                                                    
-                       """;
-        ResultSet   resultSet   = connection.createStatement().executeQuery(query);
-        SimpleTable simpleTable = makeResultSetTable(resultSet);
+    public static void task4(MongoDatabase db) throws SQLException {
+        var activityCollection   = db.getCollection(Activity.collection);
+        var userCollection       = db.getCollection(User.collection);
+        var trackPointCollection = db.getCollection(TrackPoint.collection);
+
+        var agr = Arrays.asList(new Document("$addFields",
+                                             new Document("days_over",
+                                                          new Document("$dateDiff",
+                                                                       new Document("startDate", "$startDateTime")
+                                                                               .append("endDate", "$endDateTime")
+                                                                               .append("unit", "day")))),
+                                new Document("$match",
+                                             new Document("days_over",
+                                                          new Document("$gt", 0L))),
+                                new Document("$count", "days_over"));
+
+        Iterator<Document> documents = activityCollection.aggregate(agr).iterator();
+        SimpleTable<Document> simpleTable = new SimpleTable<>();
         simpleTable.setTitle("Task 4");
+        simpleTable.setItems(documents);
+        simpleTable.setCols(
+                new Column<Document>("activity's passing midnight",document -> document.getInteger("days_over"))
+        );
         simpleTable.display();
 
     }
