@@ -649,33 +649,123 @@ public class Assignment2Tasks {
 //
 //    }
 //
-//    public static void task11(MongoDatabase db) {
-//        var activityCollection   = db.getCollection(Activity.collection);
-//        var userCollection       = db.getCollection(User.collection);
-//        var trackPointCollection = db.getCollection(TrackPoint.collection);
-//        String query = """
-//                       WITH delta_alt_tps AS (
-//                           SELECT track_point.id, track_point.activity_id , LEAD(track_point.altitude) OVER (PARTITION BY track_point.activity_id ORDER BY id) - track_point.altitude AS delta_alt
-//                           FROM track_point
-//                           WHERE track_point.altitude != -777
-//                           AND track_point.altitude IS NOT NULL
-//                       ),
-//                       delta_alt_act AS (
-//                           SELECT delta_alt_tps.activity_id, SUM(IF(delta_alt_tps.delta_alt > 0, delta_alt_tps.delta_alt, 0)) AS altitude_gain
-//                           FROM delta_alt_tps
-//                           GROUP BY delta_alt_tps.activity_id)
-//                       SELECT activity.user_id, (SUM(delta_alt_act.altitude_gain)/ 3.2808) AS user_altitude_gain_m
-//                       FROM activity
-//                                JOIN delta_alt_act ON activity.id = delta_alt_act.activity_id
-//                       GROUP BY activity.user_id
-//                       ORDER BY  user_altitude_gain_m DESC
-//                       LIMIT 20;
-//                       """;
-//        ResultSet   resultSet   = connection.createStatement().executeQuery(query);
-//        SimpleTable simpleTable = makeResultSetTable(resultSet);
-//        simpleTable.setTitle("Task 11");
-//        simpleTable.display();
-//    }
+    public static void task11(MongoDatabase db) {
+        var activityCollection   = db.getCollection(Activity.collection);
+        var userCollection       = db.getCollection(User.collection);
+        var trackPointCollection = db.getCollection(TrackPoint.collection);
+
+/*
+[{
+    $setWindowFields: {
+        partitionBy: "$activity_id",
+        sortBy: {
+            "dateDays": 1
+        },
+        output: {
+            altitude_shift: {
+                $shift: {
+                    output: "$altitude",
+                    by: -1,
+                    default: "Not available"
+                }
+            }
+        }
+    }
+}, {
+    $match: {
+        $expr: {
+            $gt: ["$altitude", "$altitude_shift"]
+        }
+    }
+}, {
+    $addFields: {
+        altitude_delta: {
+            $subtract: ["$altitude", "$altitude_shift"]
+        }
+    }
+}, {
+    $group: {
+        _id: "$activity_id",
+        activity_alt_gain: {
+            $sum: "$altitude_delta"
+        }
+    }
+}, {
+    $lookup: {
+        from: 'activity',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'act_data'
+    }
+}, {
+    $unwind: {
+        path: "$act_data",
+    }
+}, {
+    $group: {
+        _id: "$act_data.user_id",
+        usr_gain: {
+            $sum: "$activity_alt_gain"
+        }
+    }
+}, {
+    $sort: {
+        usr_gain: -1
+    }
+}, {
+    $limit: 20
+}]
+ */
+        var agr = Arrays.asList(new Document("$setWindowFields",
+                                             new Document("partitionBy", "$activity_id")
+                                                     .append("sortBy",
+                                                             new Document("dateDays", 1L))
+                                                     .append("output",
+                                                             new Document("altitude_shift",
+                                                                          new Document("$shift",
+                                                                                       new Document("output", "$altitude")
+                                                                                               .append("by", -1L)
+                                                                                               .append("default", "Not available"))))),
+                                new Document("$match",
+                                             new Document("$expr",
+                                                          new Document("$gt", Arrays.asList("$altitude", "$altitude_shift")))),
+                                new Document("$addFields",
+                                             new Document("altitude_delta",
+                                                          new Document("$subtract", Arrays.asList("$altitude", "$altitude_shift")))),
+                                new Document("$group",
+                                             new Document("_id", "$activity_id")
+                                                     .append("activity_alt_gain",
+                                                             new Document("$sum", "$altitude_delta"))),
+                                new Document("$lookup",
+                                             new Document("from", "activity")
+                                                     .append("localField", "_id")
+                                                     .append("foreignField", "_id")
+                                                     .append("as", "act_data")),
+                                new Document("$unwind",
+                                             new Document("path", "$act_data")),
+                                new Document("$group",
+                                             new Document("_id", "$act_data.user_id")
+                                                     .append("usr_gain",
+                                                             new Document("$sum", "$activity_alt_gain"))),
+                                new Document("$sort",
+                                             new Document("usr_gain", -1L)),
+                                new Document("$addFields",
+                                             new Document("usr_gain_m",
+                                                          new Document("$multiply", Arrays.asList("$usr_gain", 0.3048d)))));
+
+        Iterator<Document> documents = trackPointCollection.aggregate(agr).allowDiskUse(true).iterator();
+
+
+        SimpleTable<Document> simpleTable = new SimpleTable<>();
+        simpleTable.setTitle("Task 11");
+        simpleTable.setItems(documents);
+        simpleTable.setCols(
+                new Column<Document>("user",document -> document.getInteger("_id")),
+                new Column<Document>("altitude gain",document -> document.getDouble("usr_gain"))
+
+        );
+        simpleTable.display();
+    }
 //
 //    public static void task12(MongoDatabase db) {
 //        var activityCollection   = db.getCollection(Activity.collection);

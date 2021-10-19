@@ -22,11 +22,11 @@ public class main {
 //            Assignment2Tasks.task5(db);
             //Assignment2Tasks.task6(db);
             //Assignment2Tasks.task7(db);
-            Assignment2Tasks.task8(db);
+            //Assignment2Tasks.task8(db);
             //            Assignment2Tasks.task9(connection);
             //            Assignment2Tasks.task10(connection);
-            //            Assignment2Tasks.task11(connection);
-            //            Assignment2Tasks.task12(connection);
+            Assignment2Tasks.task11(db);
+            //Assignment2Tasks.task12(connection);
 
 
         } catch (Exception e) {
