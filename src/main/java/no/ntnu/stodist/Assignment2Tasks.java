@@ -719,7 +719,7 @@ public class Assignment2Tasks {
         var agr = Arrays.asList(new Document("$setWindowFields",
                                              new Document("partitionBy", "$activity_id")
                                                      .append("sortBy",
-                                                             new Document("dateDays", 1L))
+                                                             new Document("_id", 1L))
                                                      .append("output",
                                                              new Document("altitude_shift",
                                                                           new Document("$shift",
@@ -766,35 +766,117 @@ public class Assignment2Tasks {
         );
         simpleTable.display();
     }
-//
-//    public static void task12(MongoDatabase db) {
-//        var activityCollection   = db.getCollection(Activity.collection);
-//        var userCollection       = db.getCollection(User.collection);
-//        var trackPointCollection = db.getCollection(TrackPoint.collection);
-//        String query = """
-//                       WITH shifted_tps AS (
-//                           SELECT
-//                               track_point.activity_id,
-//                               track_point.date_time,
-//                               LEAD(track_point.date_time)
-//                                   OVER (PARTITION BY track_point.activity_id ORDER BY track_point.id) AS shifted_time
-//                           FROM
-//                               track_point
-//                       )
-//                       SELECT activity.user_id, COUNT(*) AS num_invalid_activities
-//                       FROM (
-//                               SELECT shifted_tps.activity_id, MINUTE(TIMEDIFF(shifted_tps.date_time, shifted_tps.shifted_time)) AS td
-//                               FROM shifted_tps
-//                               WHERE MINUTE(TIMEDIFF(shifted_tps.date_time, shifted_tps.shifted_time)) > 5
-//                       ) AS invalid_acts
-//                       INNER JOIN activity
-//                       ON invalid_acts.activity_id = activity.id
-//                       GROUP BY activity.user_id
-//                       ORDER BY num_invalid_activities DESC;
-//                       """;
-//        ResultSet   resultSet   = connection.createStatement().executeQuery(query);
-//        SimpleTable simpleTable = makeResultSetTable(resultSet);
-//        simpleTable.setTitle("Task 12");
-//        simpleTable.display();
-//    }
+
+    public static void task12(MongoDatabase db) {
+        var activityCollection   = db.getCollection(Activity.collection);
+        var userCollection       = db.getCollection(User.collection);
+        var trackPointCollection = db.getCollection(TrackPoint.collection);
+
+        /*
+        [{$setWindowFields: {
+  partitionBy: "$activity_id",
+  sortBy: {"dateDays": 1},
+  output: {
+      time_shifted: {
+          $shift: {
+              output: "$dateTime",
+              by: -1,
+              default: null
+          }
+      }
+  }
+}}, {$match: {
+  time_shifted: {$ne: null}
+}}, {$addFields: {
+  "min_dif": {
+    $divide: [
+                {
+                  $abs:{
+                  $subtract: ["$time_shifted", "$dateTime"]
+                  }
+                },
+                {
+                  $multiply: [ 60 , 1000]
+                }
+            ]
+}}}, {$match: {
+  min_dif: {$gte: 5}
+}}, {$group: {
+  _id: "$activity_id",
+  num_invalid: {
+    $count: {}
+  }
+}}, {$lookup: {
+  from: 'activity',
+  localField: '_id',
+  foreignField: '_id',
+  as: 'act_data'
+}}, {$unwind: {
+  path: "$act_data",
+}}, {$group: {
+  _id: "$act_data.user_id",
+  num_invalid: {
+    $count: {}
+  }
+}}, {$sort: {
+  num_invalid: -1
+}}]
+         */
+
+        var agr = Arrays.asList(new Document("$setWindowFields",
+                                             new Document("partitionBy", "$activity_id")
+                                                     .append("sortBy",
+                                                             new Document("_id", 1L))
+                                                     .append("output",
+                                                             new Document("time_shifted",
+                                                                          new Document("$shift",
+                                                                                       new Document("output", "$dateTime")
+                                                                                               .append("by", -1L)
+                                                                                               .append("default",
+                                                                                                       new BsonNull()))))),
+                                new Document("$match",
+                                             new Document("time_shifted",
+                                                          new Document("$ne",
+                                                                       new BsonNull()))),
+                                new Document("$addFields",
+                                             new Document("min_dif",
+                                                          new Document("$divide", Arrays.asList(new Document("$abs",
+                                                                                                             new Document("$subtract", Arrays.asList("$time_shifted", "$dateTime"))),
+                                                                                                new Document("$multiply", Arrays.asList(60L, 1000L)))))),
+                                new Document("$match",
+                                             new Document("min_dif",
+                                                          new Document("$gte", 5L))),
+                                new Document("$group",
+                                             new Document("_id", "$activity_id")
+                                                     .append("num_invalid",
+                                                             new Document("$count",
+                                                                          new Document()))),
+                                new Document("$lookup",
+                                             new Document("from", "activity")
+                                                     .append("localField", "_id")
+                                                     .append("foreignField", "_id")
+                                                     .append("as", "act_data")),
+                                new Document("$unwind",
+                                             new Document("path", "$act_data")),
+                                new Document("$group",
+                                             new Document("_id", "$act_data.user_id")
+                                                     .append("num_invalid",
+                                                             new Document("$count",
+                                                                          new Document()))),
+                                new Document("$sort",
+                                             new Document("num_invalid", -1L)));
+
+        Iterator<Document> documents = trackPointCollection.aggregate(agr).allowDiskUse(true).iterator();
+
+
+        SimpleTable<Document> simpleTable = new SimpleTable<>();
+        simpleTable.setTitle("Task 11");
+        simpleTable.setItems(documents);
+        simpleTable.setCols(
+                new Column<Document>("user",document -> document.getInteger("_id")),
+                new Column<Document>("num invalid",document -> document.getInteger("num_invalid"))
+
+        );
+        simpleTable.display();
+    }
 }
