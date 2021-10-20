@@ -61,4 +61,14 @@ public class Activity {
                 .append("startDateTime", Date.from(getStartDateTime().toInstant(ZoneOffset.UTC)))
                 .append("endDateTime", Date.from(getEndDateTime().toInstant(ZoneOffset.UTC)));
     }
+
+    public Document toDnormDocument(int parentId){
+        return new Document("_id", this.getId())
+                .append("user_id", parentId)
+                //.append("trackPoints", this.getTrackPoints().stream().map(TrackPoint::getId).toList())
+                .append("trackPoints", this.getTrackPoints().stream().map(trackPoint -> trackPoint.toDocument(this.getId())).toList())
+                .append("transportationMode", this.getTransportationMode().orElse(null))
+                .append("startDateTime", Date.from(getStartDateTime().toInstant(ZoneOffset.UTC)))
+                .append("endDateTime", Date.from(getEndDateTime().toInstant(ZoneOffset.UTC)));
+    }
 }
