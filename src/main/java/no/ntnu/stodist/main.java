@@ -18,13 +18,14 @@ public class main {
             //Assignment2Tasks.task1(db);
             //Assignment2Tasks.task2(db);
             //Assignment2Tasks.task3(db);
-            Assignment2Tasks.task4(db);
+            //Assignment2Tasks.task4(db);
             //            Assignment2Tasks.task5(connection);
             //Assignment2Tasks.task6(connection);
             //            Assignment2Tasks.task7(connection);
             //            Assignment2Tasks.task8(connection);
             //            Assignment2Tasks.task9(connection);
-            //            Assignment2Tasks.task10(connection);
+             //           Assignment2Tasks.task10(db);
+                        Assignment2Tasks.task10(db);
             //            Assignment2Tasks.task11(connection);
             //            Assignment2Tasks.task12(connection);
 

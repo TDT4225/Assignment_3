@@ -1,42 +1,24 @@
 package no.ntnu.stodist;
 
-import com.mongodb.Block;
-import com.mongodb.DB;
-import com.mongodb.DBCallback;
-import com.mongodb.DBCollection;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
-import com.mongodb.client.model.Accumulators;
-import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.Field;
-import com.mongodb.client.model.Updates;
-import lombok.Data;
 import no.ntnu.stodist.models.Activity;
 import no.ntnu.stodist.models.TrackPoint;
 import no.ntnu.stodist.models.User;
 import no.ntnu.stodist.simpleTable.Column;
 import no.ntnu.stodist.simpleTable.SimpleTable;
-import org.bson.conversions.Bson;
+import org.bson.Document;
 
 import java.util.*;
 
-import org.bson.Document;
 import org.bson.BsonNull;
 
-import javax.print.Doc;
 import java.io.File;
 import java.io.IOException;
 import java.sql.*;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.chrono.ChronoPeriod;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
-import java.time.temporal.Temporal;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
+
 public class Assignment2Tasks {
 
 
@@ -399,60 +381,63 @@ public class Assignment2Tasks {
         task9b(connection);
     }
 
-    public static void task10(Connection connection) throws SQLException {
-        String query = """
-                       SELECT tp.*
-                       FROM (SELECT * FROM user WHERE user.id = 113) AS u # we use 113 instead of 112 because the indexes are shifted
-                       INNER JOIN (
-                           SELECT *
-                           FROM activity
-                           WHERE YEAR(start_date_time) = 2008
-                           AND transportation_mode = 'walk'
-                           ) a
-                       ON u.id = a.user_id
-                       INNER JOIN track_point tp
-                       ON a.id = tp.activity_id
-                       """;
-        ResultSet resultSet = connection.createStatement().executeQuery(query);
+    public static void task10(MongoDatabase db) throws SQLException
+    {
+        MongoCollection<Document> activityCollection = db.getCollection("activity");
+        MongoCollection<Document> trackPointCollection = db.getCollection("trackPoint");
 
-        HashMap<Integer, Activity> activities = new HashMap<>();
+        var agr = Arrays.asList(new Document("$match",
+                        new Document("user_id", 113L)
+                                .append("transportationMode", "walk")
+                                .append("startDateTime",
+                                        new Document("$gte",
+                                                new java.util.Date(1199145600000L))
+                                                .append("$lte",
+                                                        new java.util.Date(1230768000000L)))),
+                new Document("$group",
+                        new Document("_id", 1L)
+                                .append("ac_ids",
+                                        new Document("$push",
+                                                new Document("id", "$_id")))));
 
-        while (resultSet.next()) {
-            TrackPoint trackPoint = new TrackPoint();
-            trackPoint.setLatitude(resultSet.getDouble(3));
-            trackPoint.setLongitude(resultSet.getDouble(4));
-
-            int activityId = resultSet.getInt(2);
-            if (! activities.containsKey(activityId)) {
-                activities.put(activityId, new Activity(activityId));
-            }
-            Activity parentAct = activities.get(activityId);
-            parentAct.getTrackPoints().add(trackPoint);
+        Iterator<Document> dap = activityCollection.aggregate(agr).iterator();
+        List<Integer> ids = new ArrayList<>();
+        List<Document> list = (List<Document>)dap.next().get("ac_ids");
+        for(Document d : list)
+        {
+            ids.add(d.getInteger("id"));
         }
 
-        double totDist = activities.values().stream().parallel().map(activity -> {
-            TrackPoint keep = null;
-            double     roll = 0;
-            for (TrackPoint trackPoint : activity.getTrackPoints()) {
-                if (keep == null) {
-                    keep = trackPoint;
-                    continue;
-                }
-                roll += haversineDistance(trackPoint.getLatitude(),
-                                           keep.getLatitude(),
-                                           trackPoint.getLongitude(),
-                                           keep.getLongitude()
-                );
-                keep = trackPoint;
+            var agr_t = Arrays.asList(new Document("$match",
+                            new Document("activity_id",
+                                    new Document("$in", ids))),
+                    new Document("$project",
+                            new Document("dateDays", 1L)
+                                    .append("activity_id", 1L)
+                                    .append("latitude", 1L)
+                                    .append("longitude", 1L)),
+                    new Document("$sort",
+                            new Document("dateDays", 1L)));
 
+        double tot_dist = 0.0d;
+        int cur_id = -1;
+        double last_lon = 0.0d;
+        double last_lat = 0.0d;
+
+        for(Document d : trackPointCollection.aggregate(agr_t))
+        {
+            int ac_id = d.getInteger("activity_id");
+            if(cur_id == ac_id)
+            {
+                tot_dist += haversineDistance(d.getDouble("latitude"), last_lat, d.getDouble("longitude"), last_lon);
             }
-            return roll;
-        }).reduce(Double::sum).get();
-
-        System.out.println("\tTask 10");
-        System.out.printf("User 112 have in total walked %.3f km in 2008\n", totDist);
-
+            cur_id = ac_id;
+            last_lon = d.getDouble("longitude");
+            last_lat = d.getDouble("latitude");
+        }
+        System.out.println(tot_dist);
     }
+
 
     public static void task11(Connection connection) throws SQLException {
         String query = """
