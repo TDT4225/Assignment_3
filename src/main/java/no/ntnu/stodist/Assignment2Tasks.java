@@ -515,92 +515,216 @@ public class Assignment2Tasks {
         );
         simpleTable.display();
     }
-//
-//    private static void task9a(MongoDatabase db) {
-//        var activityCollection   = db.getCollection(Activity.collection);
-//        var userCollection       = db.getCollection(User.collection);
-//        var trackPointCollection = db.getCollection(TrackPoint.collection);
-//        String query = """
-//                       SELECT COUNT(*) AS num_activites, YEAR(activity.start_date_time) AS year, MONTH(activity.start_date_time) AS month
-//                       FROM activity
-//                       GROUP BY year, month
-//                       ORDER BY num_activities DESC
-//                       LIMIT 1;
-//                       """;
-//        ResultSet                 resultSet   = connection.createStatement().executeQuery(query);
-//        SimpleTable<List<String>> simpleTable = makeResultSetTable(resultSet);
-//        simpleTable.setTitle("Task 9a");
-//        simpleTable.display();
-//    }
-//
-//    private static void task9b(MongoDatabase db) {
-//        var activityCollection   = db.getCollection(Activity.collection);
-//        var userCollection       = db.getCollection(User.collection);
-//        var trackPointCollection = db.getCollection(TrackPoint.collection);
-//        String query = """
-//                       SELECT COUNT(a.user_id) AS num_activities, a.user_id, SUM(TIMEDIFF(a.end_date_time,a.start_date_time)) AS time_spent
-//                       FROM
-//                            activity AS a,
-//                            (SELECT COUNT(*) AS num_activites, YEAR(activity.start_date_time) AS year, MONTH(activity.start_date_time) AS month
-//                             FROM activity
-//                             GROUP BY year, month
-//                             ORDER BY num_activities DESC
-//                             LIMIT 1) AS best_t
-//                       WHERE YEAR(a.start_date_time) = best_t.year
-//                       AND MONTH(a.start_date_time) = best_t.month
-//                       GROUP BY user_id
-//                       ORDER BY COUNT(a.user_id) DESC
-//                       LIMIT 2;
-//                       """;
-//        ResultSet                 resultSet   = connection.createStatement().executeQuery(query);
-//        SimpleTable<List<String>> simpleTable = makeResultSetTable(resultSet);
-//        simpleTable.setTitle("Task 9b");
-//        simpleTable.display();
-//
-//        List<List<String>> tabelData = simpleTable.getItems();
-//
-//        var timeSpentTop    = Duration.ofSeconds(Long.parseLong(tabelData.get(0).get(2)));
-//        var timeSpentSecond = Duration.ofSeconds(Long.parseLong(tabelData.get(1).get(2)));
-//
-//        int dif = timeSpentTop.compareTo(timeSpentSecond);
-//        if (dif > 0) {
-//            System.out.printf(
-//                    "the user with the most activities, user: %s spent more time activitying than the user with the second most activities\n",
-//                    tabelData.get(0).get(0)
-//            );
-//        } else if (dif < 0) {
-//            System.out.printf(
-//                    "the user with the next most activities, user: %s spent more time activitying than the user with the second most activities\n",
-//                    tabelData.get(1).get(0)
-//            );
-//        } else {
-//            System.out.println("the top and next top users spent the same time activitying");
-//        }
-//
-//        System.out.printf("user: %-4s with most activities spent     : Hours: %-3s Min: %-2s Sec: %s\n",
-//                          tabelData.get(0).get(0),
-//                          timeSpentTop.toHours(),
-//                          timeSpentTop.minusHours(timeSpentTop.toHours()).toMinutes(),
-//                          timeSpentTop.minusMinutes(timeSpentTop.toMinutes())
-//                                      .toSeconds()
-//        );
-//        System.out.printf("user: %-4s with next most activities spent: Hours: %-3s Min: %-2s Sec: %s\n",
-//                          tabelData.get(1).get(0),
-//                          timeSpentSecond.toHours(),
-//                          timeSpentSecond.minusHours(timeSpentSecond.toHours()).toMinutes(),
-//                          timeSpentSecond.minusMinutes(timeSpentSecond.toMinutes())
-//                                         .toSeconds()
-//        );
-//
-//
-//    }
-//
-//    public static void task9(MongoDatabase db) {
-//        task9a(db);
-//        task9b(db);
-//    }
-//
-//
+
+   private static void task9a(MongoDatabase db) {
+       var activityCollection   = db.getCollection(Activity.collection);
+
+        /*
+
+        MongoDB query in JSON format:
+
+        {
+            '$group': {
+                '_id': {
+                    'year': {
+                        '$year': '$startDateTime'
+                    }, 
+                    'month': {
+                        '$month': '$startDateTime'
+                    }
+                }, 
+                'count': {
+                    '$sum': 1
+                }
+            }
+        }, {
+            '$sort': {
+                'count': -1
+            }
+        }, {
+            '$limit': 1
+        }
+
+        */
+
+       var agr = Arrays.asList( new Document("$group", 
+                                new Document("_id", 
+                                new Document("year", 
+                                new Document("$year", "$startDateTime"))
+                                        .append("month", 
+                                new Document("$month", "$startDateTime")))
+                                        .append("count", 
+                                new Document("$sum", 1L))), 
+                                new Document("$sort", 
+                                new Document("count", -1L)), 
+                                new Document("$limit", 1L)
+                            );
+       
+       Iterator<Document> documents = activityCollection.aggregate(agr).iterator();
+       SimpleTable<Document> simpleTable = new SimpleTable<>();
+       simpleTable.setTitle("Task 9a");
+       simpleTable.setItems(documents);
+       simpleTable.setCols(
+            new Column<Document>("Year", document -> document.getEmbedded(List.of("_id", "year"), Integer.class)),
+            new Column<Document>("Month", document -> document.getEmbedded(List.of("_id", "month"), Integer.class)),
+            new Column<Document>("Number of Activities", document -> document.getLong("count"))
+        );
+       simpleTable.display();
+   }
+
+   private static void task9b(MongoDatabase db) {
+        var activityCollection   = db.getCollection(Activity.collection);
+
+        /*
+
+        MongoDB query in JSON format:
+
+        {
+            '$group': {
+                '_id': {
+                    'year': {
+                        '$year': '$startDateTime'
+                    }, 
+                    'month': {
+                        '$month': '$startDateTime'
+                    }
+                }, 
+                'count': {
+                    '$sum': 1
+                }, 
+                'user_ids': {
+                    '$push': {
+                        'user_id': '$user_id', 
+                        'hours': {
+                            '$divide': [
+                                {
+                                    '$subtract': [
+                                        '$endDateTime', '$startDateTime'
+                                    ]
+                                }, 60 * 1000 * 60
+                            ]
+                        }
+                    }
+                }
+            }
+        }, {
+            '$sort': {
+                'count': -1
+            }
+        }, {
+            '$limit': 1
+        }, {
+            '$unwind': {
+                'path': '$user_ids'
+            }
+        }, {
+            '$group': {
+                '_id': {
+                    'user_id': '$user_ids.user_id'
+                }, 
+                'total_hours': {
+                    '$sum': '$user_ids.hours'
+                }, 
+                'num_activities': {
+                    '$sum': 1
+                }
+            }
+        }, {
+            '$sort': {
+                'num_activities': -1
+            }
+        }, {
+            '$limit': 3
+        }
+
+        */
+        var agr = Arrays.asList(new Document("$group", 
+                                new Document("_id", 
+                                new Document("year", 
+                                new Document("$year", "$startDateTime"))
+                                            .append("month", 
+                                new Document("$month", "$startDateTime")))
+                                        .append("count", 
+                                new Document("$sum", 1L))
+                                        .append("user_ids", 
+                                new Document("$push", 
+                                new Document("user_id", "$user_id")
+                                                .append("hours", 
+                                new Document("$divide", Arrays.asList(new Document("$subtract", Arrays.asList("$endDateTime", "$startDateTime")), 60L * 1000L * 60L)))))), 
+                                new Document("$sort", 
+                                new Document("count", -1L)), 
+                                new Document("$limit", 1L), 
+                                new Document("$unwind", 
+                                new Document("path", "$user_ids")), 
+                                new Document("$group", 
+                                new Document("_id", 
+                                new Document("user_id", "$user_ids.user_id"))
+                                        .append("total_hours", 
+                                new Document("$sum", "$user_ids.hours"))
+                                        .append("num_activities", 
+                                new Document("$sum", 1L))), 
+                                new Document("$sort", 
+                                new Document("num_activities", -1L)), 
+                                new Document("$limit", 3L));
+
+        Iterator<Document> documents = activityCollection.aggregate(agr).iterator();
+        SimpleTable<Document> simpleTable = new SimpleTable<>();
+        simpleTable.setTitle("Task 9b");
+        simpleTable.setItems(documents);
+        simpleTable.setCols(
+            new Column<Document>("User ID", document -> document.getEmbedded(List.of("_id", "user_id"), Integer.class)),
+            new Column<Document>("Num Activities", document -> document.getLong("num_activities")),
+            new Column<Document>("Total Hours", document -> document.getDouble("total_hours"))
+        );
+        simpleTable.display();
+
+        List<Document> tableData = simpleTable.getItems();
+
+        Double timeSpentTop    = tableData.get(0).getDouble("total_hours");
+        Double timeSpentSecond = tableData.get(1).getDouble("total_hours");
+
+        int dif = timeSpentTop.compareTo(timeSpentSecond);
+        if (dif > 0) {
+            System.out.printf(
+                    "The user with the most activities, user: %s, spent more time on their activities than the user with the second most activities\n",
+                    tableData.get(0).getEmbedded(List.of("_id", "user_id"), Integer.class)
+            );
+        } else if (dif < 0) {
+            System.out.printf(
+                    "The user with the next most activities, user: %s, spent more time on their activities than the user with the second most activities\n",
+                    tableData.get(1).getEmbedded(List.of("_id", "user_id"), Integer.class)
+            );
+        } else {
+            System.out.println("The top and next top users spent the same time activitying");
+        }
+
+        int hoursTop = timeSpentTop.intValue();
+        int minutesTop = (int) ((timeSpentTop - hoursTop) * 60);
+        int secondsTop = (int) ((timeSpentTop - hoursTop - minutesTop/ 60.0) * 3600);
+        
+        System.out.printf("User: %-4s with the most activities spent     : Hours: %-3s Min: %-2s Sec: %s\n",
+                            tableData.get(0).getEmbedded(List.of("_id", "user_id"), Integer.class),
+                            hoursTop,
+                            minutesTop,
+                            secondsTop                 
+        );
+        
+        int hoursSecond = timeSpentSecond.intValue();
+        int minutesSecond = (int) ((timeSpentSecond - hoursSecond) * 60);
+        int secondsSecond = (int) ((timeSpentSecond - hoursSecond - minutesSecond / 60.0) * 3600);
+
+        System.out.printf("User: %-4s with the second most activities spent: Hours: %-3s Min: %-2s Sec: %s\n",
+                            tableData.get(1).getEmbedded(List.of("_id", "user_id"), Integer.class),
+                            hoursSecond,
+                            minutesSecond,
+                            secondsSecond                  
+        );
+   }
+
+   public static void task9(MongoDatabase db) {
+       task9a(db);
+       task9b(db);
+   }
 
     public static void task10(MongoDatabase db)
     {

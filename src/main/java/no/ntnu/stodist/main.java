@@ -24,12 +24,10 @@ public class main {
             //Assignment2Tasks.task6(db);
             Assignment2Tasks.task7(db);
             Assignment2Tasks.task8(db);
-            //Assignment2Tasks.task9(db);
+            Assignment2Tasks.task9(db);
             Assignment2Tasks.task10(db);
             Assignment2Tasks.task11(db);
             Assignment2Tasks.task12(db);
-
-
 
         } catch (Exception e) {
             e.printStackTrace();

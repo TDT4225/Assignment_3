@@ -42,3 +42,11 @@ db_login.env
 *.env
 .idea/
 datasett
+.vscode/launch.json
+.DS_Store
+src/main/java/no/ntnu/stodist/Assignment2Tasks.java
+.classpath
+.factorypath
+.project
+.settings/org.eclipse.core.resources.prefs
+.settings/org.eclipse.jdt.core.prefs
