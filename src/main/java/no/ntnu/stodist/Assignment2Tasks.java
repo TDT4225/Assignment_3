@@ -249,7 +249,7 @@ public class Assignment2Tasks {
                                                                                .append("unit", "day")))),
                                 new Document("$match",
                                              new Document("days_over",
-                                                          new Document("$gt", 0L))),
+                                                          new Document("$eq", 1L))),
                                 new Document("$count", "days_over"));
 
         Iterator<Document> documents = activityCollection.aggregate(agr).iterator();
@@ -424,7 +424,7 @@ public class Assignment2Tasks {
         var userCollection       = db.getCollection(User.collection);
         var trackPointCollection = db.getCollection(TrackPoint.collection);
 
-
+        /*
         String query = """
                        SELECT id
                        FROM user
@@ -442,18 +442,40 @@ public class Assignment2Tasks {
                                 new Document("$group",
                                              new Document("_id", "$user_id")),
                                 new Document("$count", "num_users"));
+        */
+        var agr = Arrays.asList(new Document("$match",
+                        new Document("transportationMode",
+                                new Document("$in", Arrays.asList("taxi")))),
+                new Document("$group",
+                        new Document("_id", "$user_id")
+                                .append("count",
+                                        new Document("$count",
+                                                new Document()))));
 
-        Iterator<Document> documents = activityCollection.aggregate(agr).iterator();
+
+        Iterator<Document> taxi_activities = activityCollection.aggregate(agr).iterator();
+        List<Integer> user_ids = new ArrayList<>();
+
+        while(taxi_activities.hasNext())
+        {
+            user_ids.add(taxi_activities.next().getInteger("_id"));
+        }
+
+        var user_query = Arrays.asList(new Document("$match",
+                new Document("_id",
+                        new Document("$nin", user_ids))),
+                new Document("$count", "num_users"));
+
+        var taxi_haters = userCollection.aggregate(user_query).iterator();
 
 
         SimpleTable<Document> simpleTable = new SimpleTable<>();
         simpleTable.setTitle("Task 7");
-        simpleTable.setItems(documents);
+        simpleTable.setItems(taxi_haters);
         simpleTable.setCols(
                 new Column<Document>("non taxi users",document -> document.getInteger("num_users"))
         );
         simpleTable.display();
-
     }
 
 
@@ -634,8 +656,8 @@ public class Assignment2Tasks {
             last_lon = d.getDouble("longitude");
             last_lat = d.getDouble("latitude");
         }
-        System.out.println("Total distance walked by user 112 in 2008");
-        System.out.println(tot_dist);
+        System.out.println("Total distance walked by user 112 in 2008:");
+        System.out.printf("%.5f km\n", tot_dist);
     }
 
 
