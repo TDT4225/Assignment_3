@@ -410,19 +410,14 @@ public class Assignment3Tasks {
         simpleTable.display();
     }
 
-
     public static void task8(MongoDatabase db) {
         MongoCollection<Document> activityCollection = db.getCollection(Activity.collection);
 
-        /*
-
-        MongoDB query in JSON format:
-
-        MISSING
-
-        */
-
-        List<Document> agr = Arrays.asList(new Document("$group",
+        List<Document> agr = Arrays.asList(
+                                new Document("$match",
+                                            new Document("transportationMode",
+                                                    new Document("$ne", new BsonNull()))),
+                                new Document("$group",
                                              new Document("_id",
                                                           new Document("transportationMode", "$transportationMode")
                                                                   .append("user_id", "$user_id"))
@@ -437,14 +432,12 @@ public class Assignment3Tasks {
 
         Iterator<Document> documents = activityCollection.aggregate(agr).iterator();
 
-
         SimpleTable<Document> simpleTable = new SimpleTable<>();
         simpleTable.setTitle("Task 8");
         simpleTable.setItems(documents);
         simpleTable.setCols(
                 new Column<Document>("transportation type",document -> document.getString("_id")),
                 new Column<Document>("num",document -> document.getInteger("cnt"))
-
         );
         simpleTable.display();
     }
@@ -660,6 +653,7 @@ public class Assignment3Tasks {
        task9b(db);
    }
 
+
     public static void task10(MongoDatabase db)
     {
         MongoCollection<Document> activityCollection = db.getCollection(Activity.collection);
@@ -678,9 +672,10 @@ public class Assignment3Tasks {
                                 .append("transportationMode", "walk")
                                 .append("startDateTime",
                                         new Document("$gte",
-                                                new java.util.Date(1199145600000L))
-                                                .append("$lte",
-                                                        new java.util.Date(1230768000000L)))),
+                                                new java.util.Date(1199145600000L)))
+                                .append("endDateTime",
+                                        new Document("$lte",
+                                                new java.util.Date(1230768000000L)))),
                 new Document("$group",
                         new Document("_id", 1L)
                                 .append("ac_ids",
@@ -832,7 +827,8 @@ public class Assignment3Tasks {
                                              new Document("usr_gain", -1L)),
                                 new Document("$addFields",
                                              new Document("usr_gain_m",
-                                                          new Document("$multiply", Arrays.asList("$usr_gain", 0.3048d)))));
+                                                          new Document("$multiply", Arrays.asList("$usr_gain", 0.3048d)))),
+                                new Document("$limit", 20L));
 
         Iterator<Document> documents = trackPointCollection.aggregate(agr).allowDiskUse(true).iterator();
         SimpleTable<Document> simpleTable = new SimpleTable<>();
@@ -840,7 +836,7 @@ public class Assignment3Tasks {
         simpleTable.setItems(documents);
         simpleTable.setCols(
                 new Column<Document>("user",document -> document.getInteger("_id")),
-                new Column<Document>("altitude gain",document -> document.getInteger("usr_gain"))
+                new Column<Document>("altitude gain",document -> document.getDouble("usr_gain_m"))
         );
         simpleTable.display();
     }
@@ -964,7 +960,6 @@ public class Assignment3Tasks {
                                              new Document("num_invalid", -1L)));
 
         Iterator<Document> documents = trackPointCollection.aggregate(agr).allowDiskUse(true).iterator();
-
 
         SimpleTable<Document> simpleTable = new SimpleTable<>();
         simpleTable.setTitle("Task 12");
