@@ -3,6 +3,7 @@ package no.ntnu.stodist;
 
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.AggregateIterable;
 import no.ntnu.stodist.models.Activity;
 import no.ntnu.stodist.models.TrackPoint;
 import no.ntnu.stodist.models.User;
@@ -17,26 +18,11 @@ import org.bson.BsonNull;
 import java.io.File;
 import java.io.IOException;
 import java.sql.*;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDateTime;
-
-import java.time.chrono.ChronoPeriod;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
-import java.time.temporal.Temporal;
-import java.util.Date;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static java.util.OptionalInt.empty;
 
 
-public class Assignment2Tasks {
-
-
+public class Assignment3Tasks {
 
     /**
      * Calculates the haversine distance between two coordinates in km
@@ -66,47 +52,6 @@ public class Assignment2Tasks {
         return c * r;
     }
 
-
-    /**
-     * Get the overlap between two LocalDateTime ranges
-     *
-     * @param t1_start start of first datetime
-     * @param t1_end   end of first datetime
-     * @param t2_start start of second datetim
-     * @param t2_end   end of second datetime
-     *
-     * @return Array with start and end LocalDateTime
-     */
-    private static LocalDateTime[] getTimeOverlap(LocalDateTime t1_start,
-                                                  LocalDateTime t1_end,
-                                                  LocalDateTime t2_start,
-                                                  LocalDateTime t2_end
-    ) {
-        LocalDateTime start_overlap = t1_start.compareTo(t2_start) <= 0 ? t2_start : t1_start;
-        LocalDateTime end_overlap   = t1_end.compareTo(t2_end) <= 0 ? t1_end : t2_end;
-        return new LocalDateTime[]{start_overlap, end_overlap};
-    }
-
-    /**
-     * Return whether two LocalDatetime ranges overlap
-     *
-     * @param t1_start start of first datetime
-     * @param t1_end   end of first datetime
-     * @param t2_start start of second datetim
-     * @param t2_end   end of second datetime
-     *
-     * @return boolean, true if overlap, false if not
-     */
-    private static boolean isTimeOverlap(LocalDateTime t1_start,
-                                         LocalDateTime t1_end,
-                                         LocalDateTime t2_start,
-                                         LocalDateTime t2_end
-    ) {
-        return t1_start.isBefore(t2_end) && t2_start.isBefore(t1_end);
-    }
-    
-
-
     public static void insertData(MongoDatabase db) throws SQLException, IOException {
 
         DatasetParser datasetParser = new DatasetParser();
@@ -114,9 +59,9 @@ public class Assignment2Tasks {
 
         List<User>   users = datasetParser.parseDataset(datasetDir);
 
-        var activityCollection = db.getCollection(Activity.collection);
-        var userCollection = db.getCollection(User.collection);
-        var trackPointCollection = db.getCollection(TrackPoint.collection);
+        MongoCollection<Document> activityCollection = db.getCollection(Activity.collection);
+        MongoCollection<Document> userCollection = db.getCollection(User.collection);
+        MongoCollection<Document> trackPointCollection = db.getCollection(TrackPoint.collection);
 
         users.parallelStream().forEach(user -> {
             user.getActivities().forEach(activity -> {
@@ -128,16 +73,11 @@ public class Assignment2Tasks {
             userCollection.insertOne(user.toDocument());
         });
     }
-    private static SimpleTable<List<String>> makeResultSetTable(ResultSet resultSet) throws SQLException {
-    return null;
-    }
-
-
 
     public static void task1(MongoDatabase db) throws SQLException {
-        var activityCollection = db.getCollection(Activity.collection);
-        var userCollection = db.getCollection(User.collection);
-        var trackPointCollection = db.getCollection(TrackPoint.collection);
+        MongoCollection<Document> activityCollection = db.getCollection(Activity.collection);
+        MongoCollection<Document> userCollection = db.getCollection(User.collection);
+        MongoCollection<Document> trackPointCollection = db.getCollection(TrackPoint.collection);
 
         long activityCount = activityCollection.countDocuments();
         long userCount = userCollection.countDocuments();
@@ -150,16 +90,20 @@ public class Assignment2Tasks {
                           num tp        = %s
                           \n
                           """, activityCount,userCount,trackpointCount);
-
-
     }
 
     public static void task2(MongoDatabase db) {
-        var activityCollection = db.getCollection(Activity.collection);
-        var userCollection = db.getCollection(User.collection);
-        var trackPointCollection = db.getCollection(TrackPoint.collection);
+        MongoCollection<Document> userCollection = db.getCollection(User.collection);
 
-        var agr = Arrays.asList(new Document("$project",
+        /*
+
+        MongoDB query in JSON format:
+
+        MISSING
+
+        */
+
+        List<Document> agr = Arrays.asList(new Document("$project",
                                    new Document("num_activities",
                                                 new Document("$size", "$activities"))),
                       new Document("$group",
@@ -172,7 +116,7 @@ public class Assignment2Tasks {
                                            .append("max",
                                                    new Document("$max", "$num_activities"))));
 
-        var aggregate = userCollection.aggregate(agr);
+        AggregateIterable<Document> aggregate = userCollection.aggregate(agr);
         Document document = aggregate.iterator().next();
         double avg = document.getDouble("avg");
         int max = document.getInteger("max");
@@ -185,15 +129,20 @@ public class Assignment2Tasks {
                           num min = %s
                           \n
                           """, avg,max,min);
-
     }
 
     public static void task3(MongoDatabase db) {
-        var activityCollection   = db.getCollection(Activity.collection);
-        var userCollection       = db.getCollection(User.collection);
-        var trackPointCollection = db.getCollection(TrackPoint.collection);
+        MongoCollection<Document> userCollection = db.getCollection(User.collection);
 
-        var agr = Arrays.asList(new Document("$project",
+        /*
+
+        MongoDB query in JSON format:
+
+        MISSING
+
+        */
+
+        List<Document> agr = Arrays.asList(new Document("$project",
                                              new Document("num_activities",
                                                           new Document("$size", "$activities"))),
                                 new Document("$sort",
@@ -213,35 +162,35 @@ public class Assignment2Tasks {
     }
 
     public static void task4(MongoDatabase db) {
-        var activityCollection   = db.getCollection(Activity.collection);
-        var userCollection       = db.getCollection(User.collection);
-        var trackPointCollection = db.getCollection(TrackPoint.collection);
+        MongoCollection<Document> activityCollection = db.getCollection(Activity.collection);
 
         /*
-        db.activity.aggregate([
-            {
-                $addFields: {
-                    days_over: {
-                        $dateDiff:{
-                            startDate: "$startDateTime",
-                            endDate: "$endDateTime",
-                            unit: "day"
-                        }
+
+        MongoDB query in JSON format:
+
+        {
+            $addFields: {
+                days_over: {
+                    $dateDiff:{
+                        startDate: "$startDateTime",
+                        endDate: "$endDateTime",
+                        unit: "day"
                     }
                 }
-            },
-            {
-                $match: {
-                    days_over: {$gte: 0}
-                }
-            },
-            {
-                $count: "days_over"
             }
-        ])
-         */
+        },
+        {
+            $match: {
+                days_over: {$gte: 0}
+            }
+        },
+        {
+            $count: "days_over"
+        }
 
-        var agr = Arrays.asList(new Document("$addFields",
+        */
+
+        List<Document> agr = Arrays.asList(new Document("$addFields",
                                              new Document("days_over",
                                                           new Document("$dateDiff",
                                                                        new Document("startDate", "$startDateTime")
@@ -260,29 +209,16 @@ public class Assignment2Tasks {
                 new Column<Document>("activity's passing midnight",document -> document.getInteger("days_over"))
         );
         simpleTable.display();
-
     }
 
     public static void task5(MongoDatabase db) {
-        var activityCollection   = db.getCollection(Activity.collection);
-        var userCollection       = db.getCollection(User.collection);
-        var trackPointCollection = db.getCollection(TrackPoint.collection);
-        String query = """
-                       SELECT a.id AS duplicate_asignment_ids
-                       FROM activity AS a,
-                           (
-                               SELECT user_id, start_date_time, end_date_time
-                               FROM activity
-                               GROUP BY user_id, start_date_time, end_date_time
-                               HAVING COUNT(*) > 1
-                           ) AS f
-                       WHERE a.user_id = f.user_id
-                       AND  a.start_date_time = f.start_date_time
-                       AND a.end_date_time = f.end_date_time;
-                       """;
-                /*
-        db.activity.aggregate(
-        [{
+        MongoCollection<Document> activityCollection = db.getCollection(Activity.collection);
+
+        /*
+
+        MongoDB query in JSON format:
+
+        {
             $group: {
                 _id: {
                     startDateT: "$startDateTime",
@@ -304,11 +240,11 @@ public class Assignment2Tasks {
                 }
 
             }
-        }]
-        )
-         */
+        }
 
-        var agr = Arrays.asList(new Document("$group",
+        */
+
+        List<Document> agr = Arrays.asList(new Document("$group",
                                              new Document("_id",
                                                           new Document("startDateT", "$startDateTime")
                                                                   .append("edt", "$endDateTime")
@@ -341,31 +277,41 @@ public class Assignment2Tasks {
 
     public static void task6(MongoDatabase db) {
         /*
-        noe som heter geo near finnes men siden implementasjonen er fucking stupid så kan den ikke
-        brukes uten og endre hvordan data er lagret til MongoDB sitt BS format
+        
+        The $geoNear operator could have have been used, but due to issues with the MongoDB JAVA 
+        implementation, we could not use it.
 
+        MongoDB query in JSON format:
 
-
-[{$addFields: {
-"seconds_dif": {
-                $abs:{
-                    $dateDiff:{
-                        startDate: ISODate("2008-08-24T15:38:00"),
-                        endDate: "$dateTime",
-                        unit: "second"
+        {
+            $addFields: {
+                "seconds_dif": {
+                    $abs:{
+                        $dateDiff:{
+                            startDate: ISODate("2008-08-24T15:38:00"),
+                            endDate: "$dateTime",
+                            unit: "second"
+                        }
                     }
                 }
-            }}}, {$match: {
-  "seconds_dif": {$lte: 60}
-}}]
-         */
+            }
+        }, 
+            {
+                $match: {
+                "seconds_dif": {$lte: 60}
+            }
+        }
 
-        var activityCollection   = db.getCollection(Activity.collection);
-        var userCollection       = db.getCollection(User.collection);
-        var trackPointCollection = db.getCollection(TrackPoint.collection);
+        */
 
+        MongoCollection<Document> activityCollection = db.getCollection(Activity.collection);
+        MongoCollection<Document> trackPointCollection = db.getCollection(TrackPoint.collection);
 
-        var agr = Arrays.asList(new Document("$addFields",
+        /*
+
+        *** Not needed apparently ***
+
+        List<Document> agr = Arrays.asList(new Document("$addFields",
                                             new Document("seconds_dif",
                                                          new Document("$abs",
                                                                       new Document("$dateDiff",
@@ -375,6 +321,7 @@ public class Assignment2Tasks {
                                new Document("$match",
                                             new Document("seconds_dif",
                                                          new Document("$lte", 60L))));
+        */
 
         Iterator<Document> itr = trackPointCollection.find().iterator();
         ArrayList<Document> tpDocuments = new ArrayList<>();
@@ -414,36 +361,21 @@ public class Assignment2Tasks {
                 new Column<Document>("infected users",document -> document.getInteger("_id"))
         );
         simpleTable.display();
-
-
-
     }
 
     public static void task7(MongoDatabase db) {
-        var activityCollection   = db.getCollection(Activity.collection);
-        var userCollection       = db.getCollection(User.collection);
-        var trackPointCollection = db.getCollection(TrackPoint.collection);
+        MongoCollection<Document> activityCollection = db.getCollection(Activity.collection);
+        MongoCollection<Document> userCollection = db.getCollection(User.collection);
 
         /*
-        String query = """
-                       SELECT id
-                       FROM user
-                       WHERE id NOT IN (
-                                       SELECT DISTINCT c.user_id
-                                       FROM(
-                                               SELECT user_id, transportation_mode
-                                               FROM activity
-                                               WHERE transportation_mode = 'taxi') AS c);
-                       """;
-        var agr = Arrays.asList(new Document("$match",
-                                             new Document("transportationMode",
-                                                          new Document("$not",
-                                                                       new Document("$in", Arrays.asList("taxi"))))),
-                                new Document("$group",
-                                             new Document("_id", "$user_id")),
-                                new Document("$count", "num_users"));
+
+        MongoDB query in JSON format:
+
+        MISSING
+
         */
-        var agr = Arrays.asList(new Document("$match",
+
+        List<Document> agr = Arrays.asList(new Document("$match",
                         new Document("transportationMode",
                                 new Document("$in", Arrays.asList("taxi")))),
                 new Document("$group",
@@ -480,16 +412,17 @@ public class Assignment2Tasks {
 
 
     public static void task8(MongoDatabase db) {
-        var activityCollection   = db.getCollection(Activity.collection);
-        var userCollection       = db.getCollection(User.collection);
-        var trackPointCollection = db.getCollection(TrackPoint.collection);
-        String query = """
-                       SELECT transportation_mode, COUNT(DISTINCT user_id)
-                       FROM activity
-                       WHERE transportation_mode IS NOT NULL
-                       GROUP BY transportation_mode;
-                       """;
-        var agr = Arrays.asList(new Document("$group",
+        MongoCollection<Document> activityCollection = db.getCollection(Activity.collection);
+
+        /*
+
+        MongoDB query in JSON format:
+
+        MISSING
+
+        */
+
+        List<Document> agr = Arrays.asList(new Document("$group",
                                              new Document("_id",
                                                           new Document("transportationMode", "$transportationMode")
                                                                   .append("user_id", "$user_id"))
@@ -517,7 +450,7 @@ public class Assignment2Tasks {
     }
 
    private static void task9a(MongoDatabase db) {
-       var activityCollection   = db.getCollection(Activity.collection);
+       MongoCollection<Document> activityCollection = db.getCollection(Activity.collection);
 
         /*
 
@@ -547,7 +480,7 @@ public class Assignment2Tasks {
 
         */
 
-       var agr = Arrays.asList( new Document("$group", 
+       List<Document> agr = Arrays.asList( new Document("$group", 
                                 new Document("_id", 
                                 new Document("year", 
                                 new Document("$year", "$startDateTime"))
@@ -573,7 +506,7 @@ public class Assignment2Tasks {
    }
 
    private static void task9b(MongoDatabase db) {
-        var activityCollection   = db.getCollection(Activity.collection);
+        MongoCollection<Document> activityCollection = db.getCollection(Activity.collection);
 
         /*
 
@@ -638,7 +571,8 @@ public class Assignment2Tasks {
         }
 
         */
-        var agr = Arrays.asList(new Document("$group", 
+
+        List<Document> agr = Arrays.asList(new Document("$group", 
                                 new Document("_id", 
                                 new Document("year", 
                                 new Document("$year", "$startDateTime"))
@@ -691,11 +625,11 @@ public class Assignment2Tasks {
             );
         } else if (dif < 0) {
             System.out.printf(
-                    "The user with the next most activities, user: %s, spent more time on their activities than the user with the second most activities\n",
+                    "The user with the second most activities, user: %s, spent more time on their activities than the user with the most activities\n",
                     tableData.get(1).getEmbedded(List.of("_id", "user_id"), Integer.class)
             );
         } else {
-            System.out.println("The top and next top users spent the same time activitying");
+            System.out.println("The top and next top users spent the same amount of time on their activities");
         }
 
         int hoursTop = timeSpentTop.intValue();
@@ -728,10 +662,18 @@ public class Assignment2Tasks {
 
     public static void task10(MongoDatabase db)
     {
-        MongoCollection<Document> activityCollection = db.getCollection("activity");
-        MongoCollection<Document> trackPointCollection = db.getCollection("trackPoint");
+        MongoCollection<Document> activityCollection = db.getCollection(Activity.collection);
+        MongoCollection<Document> trackPointCollection = db.getCollection(TrackPoint.collection);
 
-        var agr = Arrays.asList(new Document("$match",
+        /*
+
+        MongoDB query in JSON format:
+
+        MISSING
+
+        */
+
+        List<Document> agr = Arrays.asList(new Document("$match",
                         new Document("user_id", 113L)
                                 .append("transportationMode", "walk")
                                 .append("startDateTime",
@@ -753,7 +695,7 @@ public class Assignment2Tasks {
             ids.add(d.getInteger("id"));
         }
 
-        var agr_t = Arrays.asList(new Document("$match",
+        List<Document> agr_t = Arrays.asList(new Document("$match",
                         new Document("activity_id",
                                 new Document("$in", ids))),
                 new Document("$project",
@@ -780,79 +722,82 @@ public class Assignment2Tasks {
             last_lon = d.getDouble("longitude");
             last_lat = d.getDouble("latitude");
         }
+        System.out.println("Task 10");
         System.out.println("Total distance walked by user 112 in 2008:");
         System.out.printf("%.5f km\n", tot_dist);
     }
 
 
     public static void task11(MongoDatabase db) {
-        var activityCollection   = db.getCollection(Activity.collection);
-        var userCollection       = db.getCollection(User.collection);
-        var trackPointCollection = db.getCollection(TrackPoint.collection);
+        MongoCollection<Document> trackPointCollection = db.getCollection(TrackPoint.collection);
 
-/*
-[{
-    $setWindowFields: {
-        partitionBy: "$activity_id",
-        sortBy: {
-            "dateDays": 1
-        },
-        output: {
-            altitude_shift: {
-                $shift: {
-                    output: "$altitude",
-                    by: -1,
-                    default: "Not available"
+        /*
+
+        MongoDB query in JSON format:
+
+        {
+            $setWindowFields: {
+                partitionBy: "$activity_id",
+                sortBy: {
+                    "dateDays": 1
+                },
+                output: {
+                    altitude_shift: {
+                        $shift: {
+                            output: "$altitude",
+                            by: -1,
+                            default: "Not available"
+                        }
+                    }
                 }
             }
+        }, {
+            $match: {
+                $expr: {
+                    $gt: ["$altitude", "$altitude_shift"]
+                }
+            }
+        }, {
+            $addFields: {
+                altitude_delta: {
+                    $subtract: ["$altitude", "$altitude_shift"]
+                }
+            }
+        }, {
+            $group: {
+                _id: "$activity_id",
+                activity_alt_gain: {
+                    $sum: "$altitude_delta"
+                }
+            }
+        }, {
+            $lookup: {
+                from: 'activity',
+                localField: '_id',
+                foreignField: '_id',
+                as: 'act_data'
+            }
+        }, {
+            $unwind: {
+                path: "$act_data",
+            }
+        }, {
+            $group: {
+                _id: "$act_data.user_id",
+                usr_gain: {
+                    $sum: "$activity_alt_gain"
+                }
+            }
+        }, {
+            $sort: {
+                usr_gain: -1
+            }
+        }, {
+            $limit: 20
         }
-    }
-}, {
-    $match: {
-        $expr: {
-            $gt: ["$altitude", "$altitude_shift"]
-        }
-    }
-}, {
-    $addFields: {
-        altitude_delta: {
-            $subtract: ["$altitude", "$altitude_shift"]
-        }
-    }
-}, {
-    $group: {
-        _id: "$activity_id",
-        activity_alt_gain: {
-            $sum: "$altitude_delta"
-        }
-    }
-}, {
-    $lookup: {
-        from: 'activity',
-        localField: '_id',
-        foreignField: '_id',
-        as: 'act_data'
-    }
-}, {
-    $unwind: {
-        path: "$act_data",
-    }
-}, {
-    $group: {
-        _id: "$act_data.user_id",
-        usr_gain: {
-            $sum: "$activity_alt_gain"
-        }
-    }
-}, {
-    $sort: {
-        usr_gain: -1
-    }
-}, {
-    $limit: 20
-}]
- */
-        var agr = Arrays.asList(new Document("$setWindowFields",
+        */
+
+        List<Document> agr = Arrays.asList(new Document("$setWindowFields",
                                              new Document("partitionBy", "$activity_id")
                                                      .append("sortBy",
                                                              new Document("_id", 1L))
@@ -890,76 +835,92 @@ public class Assignment2Tasks {
                                                           new Document("$multiply", Arrays.asList("$usr_gain", 0.3048d)))));
 
         Iterator<Document> documents = trackPointCollection.aggregate(agr).allowDiskUse(true).iterator();
-
-
         SimpleTable<Document> simpleTable = new SimpleTable<>();
         simpleTable.setTitle("Task 11");
         simpleTable.setItems(documents);
         simpleTable.setCols(
                 new Column<Document>("user",document -> document.getInteger("_id")),
-                new Column<Document>("altitude gain",document -> document.getDouble("usr_gain"))
-
+                new Column<Document>("altitude gain",document -> document.getInteger("usr_gain"))
         );
         simpleTable.display();
     }
 
     public static void task12(MongoDatabase db) {
-        var activityCollection   = db.getCollection(Activity.collection);
-        var userCollection       = db.getCollection(User.collection);
-        var trackPointCollection = db.getCollection(TrackPoint.collection);
+        MongoCollection<Document> trackPointCollection = db.getCollection(TrackPoint.collection);
 
         /*
-        [{$setWindowFields: {
-  partitionBy: "$activity_id",
-  sortBy: {"dateDays": 1},
-  output: {
-      time_shifted: {
-          $shift: {
-              output: "$dateTime",
-              by: -1,
-              default: null
-          }
-      }
-  }
-}}, {$match: {
-  time_shifted: {$ne: null}
-}}, {$addFields: {
-  "min_dif": {
-    $divide: [
-                {
-                  $abs:{
-                  $subtract: ["$time_shifted", "$dateTime"]
-                  }
-                },
-                {
-                  $multiply: [ 60 , 1000]
-                }
-            ]
-}}}, {$match: {
-  min_dif: {$gte: 5}
-}}, {$group: {
-  _id: "$activity_id",
-  num_invalid: {
-    $count: {}
-  }
-}}, {$lookup: {
-  from: 'activity',
-  localField: '_id',
-  foreignField: '_id',
-  as: 'act_data'
-}}, {$unwind: {
-  path: "$act_data",
-}}, {$group: {
-  _id: "$act_data.user_id",
-  num_invalid: {
-    $count: {}
-  }
-}}, {$sort: {
-  num_invalid: -1
-}}]
-         */
 
-        var agr = Arrays.asList(new Document("$setWindowFields",
+        MongoDB query in JSON format:
+
+        {
+            $setWindowFields: {
+                partitionBy: "$activity_id",
+                sortBy: {"dateDays": 1},
+                output: {
+                    time_shifted: {
+                        $shift: {
+                            output: "$dateTime",
+                            by: -1,
+                            default: null
+                        }
+                    }
+                }
+            }}, 
+            {
+                $match: {
+                    time_shifted: {$ne: null}
+            }}, 
+            {   $addFields: {
+                    "min_dif": {
+                        $divide: [
+                                    {
+                                    $abs:{
+                                    $subtract: ["$time_shifted", "$dateTime"]
+                                    }
+                                    },
+                                    {
+                                    $multiply: [ 60 , 1000]
+                                    }
+                                ]
+            }}}, 
+            {
+                $match: {
+                    min_dif: {$gte: 5}
+            }}, 
+            {
+                $group: {
+                    _id: "$activity_id",
+                    num_invalid: {
+                    $count: {}
+                } 
+            }}, 
+            {
+                $lookup: {
+                    from: 'activity',
+                    localField: '_id',
+                    foreignField: '_id',
+                    as: 'act_data'
+            }}, 
+            {
+                $unwind: {
+                    path: "$act_data",
+            }}, 
+            {
+                $group: {
+                    _id: "$act_data.user_id",
+                    num_invalid: {
+                    $count: {}
+            }
+            }}, 
+            {
+                $sort: {
+                    num_invalid: -1
+            }
+        }
+
+        */
+
+        List<Document> agr = Arrays.asList(new Document("$setWindowFields",
                                              new Document("partitionBy", "$activity_id")
                                                      .append("sortBy",
                                                              new Document("_id", 1L))
@@ -1009,8 +970,8 @@ public class Assignment2Tasks {
         simpleTable.setTitle("Task 12");
         simpleTable.setItems(documents);
         simpleTable.setCols(
-                new Column<Document>("user",document -> document.getInteger("_id")),
-                new Column<Document>("num invalid",document -> document.getInteger("num_invalid"))
+                new Column<Document>("user", document -> document.getInteger("_id")),
+                new Column<Document>("num invalid", document -> document.getInteger("num_invalid"))
 
         );
         simpleTable.display();
