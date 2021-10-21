@@ -489,7 +489,33 @@ public class Assignment2Tasks {
    private static void task9a(MongoDatabase db) {
        var activityCollection   = db.getCollection(Activity.collection);
 
-       System.out.println("Task 9a");
+        /*
+
+        MongoDB query in JSON format:
+
+        {
+            '$group': {
+                '_id': {
+                    'year': {
+                        '$year': '$startDateTime'
+                    }, 
+                    'month': {
+                        '$month': '$startDateTime'
+                    }
+                }, 
+                'count': {
+                    '$sum': 1
+                }
+            }
+        }, {
+            '$sort': {
+                'count': -1
+            }
+        }, {
+            '$limit': 1
+        }
+
+        */
 
        var agr = Arrays.asList( new Document("$group", 
                                 new Document("_id", 
@@ -511,7 +537,7 @@ public class Assignment2Tasks {
        simpleTable.setCols(
             new Column<Document>("Year", document -> document.getEmbedded(List.of("_id", "year"), Integer.class)),
             new Column<Document>("Month", document -> document.getEmbedded(List.of("_id", "month"), Integer.class)),
-            new Column<Document>("Count", document -> document.getLong("count"))
+            new Column<Document>("Number of Activities", document -> document.getLong("count"))
         );
        simpleTable.display();
    }
@@ -519,6 +545,69 @@ public class Assignment2Tasks {
    private static void task9b(MongoDatabase db) {
         var activityCollection   = db.getCollection(Activity.collection);
 
+        /*
+
+        MongoDB query in JSON format:
+
+        {
+            '$group': {
+                '_id': {
+                    'year': {
+                        '$year': '$startDateTime'
+                    }, 
+                    'month': {
+                        '$month': '$startDateTime'
+                    }
+                }, 
+                'count': {
+                    '$sum': 1
+                }, 
+                'user_ids': {
+                    '$push': {
+                        'user_id': '$user_id', 
+                        'hours': {
+                            '$divide': [
+                                {
+                                    '$subtract': [
+                                        '$endDateTime', '$startDateTime'
+                                    ]
+                                }, 60 * 1000 * 60
+                            ]
+                        }
+                    }
+                }
+            }
+        }, {
+            '$sort': {
+                'count': -1
+            }
+        }, {
+            '$limit': 1
+        }, {
+            '$unwind': {
+                'path': '$user_ids'
+            }
+        }, {
+            '$group': {
+                '_id': {
+                    'user_id': '$user_ids.user_id'
+                }, 
+                'total_hours': {
+                    '$sum': '$user_ids.hours'
+                }, 
+                'num_activities': {
+                    '$sum': 1
+                }
+            }
+        }, {
+            '$sort': {
+                'num_activities': -1
+            }
+        }, {
+            '$limit': 3
+        }
+
+        */
         var agr = Arrays.asList(new Document("$group", 
                                 new Document("_id", 
                                 new Document("year", 
