@@ -489,7 +489,11 @@ public class Assignment2Tasks {
                        WHERE transportation_mode IS NOT NULL
                        GROUP BY transportation_mode;
                        """;
-        var agr = Arrays.asList(new Document("$group",
+        var agr = Arrays.asList(
+                                new Document("$match",
+                                            new Document("transportationMode",
+                                                    new Document("$ne", new BsonNull()))),
+                                new Document("$group",
                                              new Document("_id",
                                                           new Document("transportationMode", "$transportationMode")
                                                                   .append("user_id", "$user_id"))
@@ -516,91 +520,7 @@ public class Assignment2Tasks {
         simpleTable.display();
     }
 //
-//    private static void task9a(MongoDatabase db) {
-//        var activityCollection   = db.getCollection(Activity.collection);
-//        var userCollection       = db.getCollection(User.collection);
-//        var trackPointCollection = db.getCollection(TrackPoint.collection);
-//        String query = """
-//                       SELECT COUNT(*) AS num_activites, YEAR(activity.start_date_time) AS year, MONTH(activity.start_date_time) AS month
-//                       FROM activity
-//                       GROUP BY year, month
-//                       ORDER BY num_activities DESC
-//                       LIMIT 1;
-//                       """;
-//        ResultSet                 resultSet   = connection.createStatement().executeQuery(query);
-//        SimpleTable<List<String>> simpleTable = makeResultSetTable(resultSet);
-//        simpleTable.setTitle("Task 9a");
-//        simpleTable.display();
-//    }
-//
-//    private static void task9b(MongoDatabase db) {
-//        var activityCollection   = db.getCollection(Activity.collection);
-//        var userCollection       = db.getCollection(User.collection);
-//        var trackPointCollection = db.getCollection(TrackPoint.collection);
-//        String query = """
-//                       SELECT COUNT(a.user_id) AS num_activities, a.user_id, SUM(TIMEDIFF(a.end_date_time,a.start_date_time)) AS time_spent
-//                       FROM
-//                            activity AS a,
-//                            (SELECT COUNT(*) AS num_activites, YEAR(activity.start_date_time) AS year, MONTH(activity.start_date_time) AS month
-//                             FROM activity
-//                             GROUP BY year, month
-//                             ORDER BY num_activities DESC
-//                             LIMIT 1) AS best_t
-//                       WHERE YEAR(a.start_date_time) = best_t.year
-//                       AND MONTH(a.start_date_time) = best_t.month
-//                       GROUP BY user_id
-//                       ORDER BY COUNT(a.user_id) DESC
-//                       LIMIT 2;
-//                       """;
-//        ResultSet                 resultSet   = connection.createStatement().executeQuery(query);
-//        SimpleTable<List<String>> simpleTable = makeResultSetTable(resultSet);
-//        simpleTable.setTitle("Task 9b");
-//        simpleTable.display();
-//
-//        List<List<String>> tabelData = simpleTable.getItems();
-//
-//        var timeSpentTop    = Duration.ofSeconds(Long.parseLong(tabelData.get(0).get(2)));
-//        var timeSpentSecond = Duration.ofSeconds(Long.parseLong(tabelData.get(1).get(2)));
-//
-//        int dif = timeSpentTop.compareTo(timeSpentSecond);
-//        if (dif > 0) {
-//            System.out.printf(
-//                    "the user with the most activities, user: %s spent more time activitying than the user with the second most activities\n",
-//                    tabelData.get(0).get(0)
-//            );
-//        } else if (dif < 0) {
-//            System.out.printf(
-//                    "the user with the next most activities, user: %s spent more time activitying than the user with the second most activities\n",
-//                    tabelData.get(1).get(0)
-//            );
-//        } else {
-//            System.out.println("the top and next top users spent the same time activitying");
-//        }
-//
-//        System.out.printf("user: %-4s with most activities spent     : Hours: %-3s Min: %-2s Sec: %s\n",
-//                          tabelData.get(0).get(0),
-//                          timeSpentTop.toHours(),
-//                          timeSpentTop.minusHours(timeSpentTop.toHours()).toMinutes(),
-//                          timeSpentTop.minusMinutes(timeSpentTop.toMinutes())
-//                                      .toSeconds()
-//        );
-//        System.out.printf("user: %-4s with next most activities spent: Hours: %-3s Min: %-2s Sec: %s\n",
-//                          tabelData.get(1).get(0),
-//                          timeSpentSecond.toHours(),
-//                          timeSpentSecond.minusHours(timeSpentSecond.toHours()).toMinutes(),
-//                          timeSpentSecond.minusMinutes(timeSpentSecond.toMinutes())
-//                                         .toSeconds()
-//        );
-//
-//
-//    }
-//
-//    public static void task9(MongoDatabase db) {
-//        task9a(db);
-//        task9b(db);
-//    }
-//
-//
+
 
     public static void task10(MongoDatabase db)
     {
@@ -612,9 +532,10 @@ public class Assignment2Tasks {
                                 .append("transportationMode", "walk")
                                 .append("startDateTime",
                                         new Document("$gte",
-                                                new java.util.Date(1199145600000L))
-                                                .append("$lte",
-                                                        new java.util.Date(1230768000000L)))),
+                                                new java.util.Date(1199145600000L)))
+                                .append("endDateTime",
+                                        new Document("$lte",
+                                                new java.util.Date(1230768000000L)))),
                 new Document("$group",
                         new Document("_id", 1L)
                                 .append("ac_ids",
@@ -763,7 +684,8 @@ public class Assignment2Tasks {
                                              new Document("usr_gain", -1L)),
                                 new Document("$addFields",
                                              new Document("usr_gain_m",
-                                                          new Document("$multiply", Arrays.asList("$usr_gain", 0.3048d)))));
+                                                          new Document("$multiply", Arrays.asList("$usr_gain", 0.3048d)))),
+                                new Document("$limit", 20L));
 
         Iterator<Document> documents = trackPointCollection.aggregate(agr).allowDiskUse(true).iterator();
 
@@ -773,7 +695,7 @@ public class Assignment2Tasks {
         simpleTable.setItems(documents);
         simpleTable.setCols(
                 new Column<Document>("user",document -> document.getInteger("_id")),
-                new Column<Document>("altitude gain",document -> document.getDouble("usr_gain"))
+                new Column<Document>("altitude gain",document -> document.getDouble("usr_gain_m"))
 
         );
         simpleTable.display();
