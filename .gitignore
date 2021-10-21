@@ -42,3 +42,5 @@ db_login.env
 *.env
 .idea/
 datasett
+.vscode/launch.json
+.DS_Store
