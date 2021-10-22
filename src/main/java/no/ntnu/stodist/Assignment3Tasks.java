@@ -100,7 +100,25 @@ public class Assignment3Tasks {
 
         MongoDB query in JSON format:
 
-        MISSING
+        {
+            $project: {
+                num_activities: {$size: "$activities"}
+            }
+        },
+        {
+            $group: {
+                _id: null,
+                avg: {
+                    $avg: "$num_activities"
+                },
+                min: {
+                    $min: "$num_activities"
+                },
+                max: {
+                    $max: "$num_activities"
+                }
+            }
+        }
 
         */
 
@@ -139,7 +157,19 @@ public class Assignment3Tasks {
 
         MongoDB query in JSON format:
 
-        MISSING
+        {
+            '$project': {
+                'num_activities': {
+                    '$size': '$activities'
+                }
+            }
+        }, {
+            '$sort': {
+                'num_activities': -1
+            }
+        }, {
+            '$limit': 10
+        }
 
         */
 
@@ -309,18 +339,22 @@ public class Assignment3Tasks {
             }
         }
 
-        [{$match: {
-  _id: {$in: [1,32,11,9,200000]}
-}}, {$lookup: {
-  from: 'activity',
-  localField: 'activity_id',
-  foreignField: '_id',
-  as: 'activity_obj'
-}}, {$unwind: {
-  path: "$activity_obj"
-}}, {$group: {
-  _id: "$activity_obj.user_id",
-}}]
+        //Second query
+        {
+            $match: {
+                _id: {$in: toCloseIds}
+            }
+        },
+        {
+            $group: {
+                _id: "$activity_obj.user_id",
+            }
+        },
+        {
+            $sort: {
+                _id: 1,
+            }
+        }
 
         */
 
@@ -386,6 +420,27 @@ public class Assignment3Tasks {
         MongoCollection<Document> userCollection = db.getCollection(User.collection);
 
 
+        /*
+          MongoDB query in JSON format:
+        {
+            '$match': {
+                'transportationMode': {
+                    '$in': [
+                        'taxi'
+                    ]
+                }
+            }
+        }, {
+            '$group': {
+                '_id': '$user_id',
+                'count': {
+                    '$count': {}
+                }
+            }
+        }
+
+         */
+
         List<Document> agr = Arrays.asList(new Document("$match",
                         new Document("transportationMode",
                                 new Document("$in", Arrays.asList("taxi")))),
@@ -403,6 +458,18 @@ public class Assignment3Tasks {
         {
             user_ids.add(taxi_activities.next().getInteger("_id"));
         }
+
+        /*
+
+        MongoDB query in JSON format:
+        {
+            '$match': {
+                '_id': {
+                    '$nin': user_ids
+                }
+            }
+        }
+        */
 
         var user_query = Arrays.asList(new Document("$match",
                 new Document("_id",
@@ -425,6 +492,34 @@ public class Assignment3Tasks {
     public static void task8(MongoDatabase db) {
         MongoCollection<Document> activityCollection = db.getCollection(Activity.collection);
 
+
+        /*
+        MongoDB query in JSON format:
+        {
+            $match: {
+                transportationMode: {
+                    $ne: null
+                }
+            }
+        }, {
+            $group: {
+                _id: {
+                    transportationMode: "$transportationMode",
+                    user_id: "$user_id"
+                },
+                cnt: {
+                    $count: {}
+                }
+            }
+        }, {
+            $group: {
+                _id: "$_id.transportationMode",
+                cnt: {
+                    $count: {}
+                }
+            }
+        }
+         */
 //        List<Document> agr = Arrays.asList(
 //                                new Document("$match",
 //                                            new Document("transportationMode",
@@ -688,7 +783,20 @@ public class Assignment3Tasks {
 
         MongoDB query in JSON format:
 
-        MISSING
+        {
+            $match: {
+                user_id: 113,
+                transportationMode: "walk",
+                startDateTime: {$gte: ISODate('2008-01-01')},
+                endDateTime: {$lte: ISODate('2009-01-01')},
+            }},
+        {
+            $group: {
+                _id: 1,
+                ac_ids: {
+                    $push: {id: "$_id"}
+                }
+        }}
 
         */
 
@@ -714,6 +822,29 @@ public class Assignment3Tasks {
         {
             ids.add(d.getInteger("id"));
         }
+
+        /*
+
+        MongoDB query in JSON format:
+        {
+            $match: {
+                activity_id: {$in: [1]}
+                }
+        },
+        {
+            $project: {
+              dateDays: 1,
+              activity_id: 1,
+              latitude: 1,
+              longitude: 1
+            }
+        },
+        {
+            $sort: {
+                dateDays: 1
+            }
+        }
+         */
 
         List<Document> agr_t = Arrays.asList(new Document("$match",
                         new Document("activity_id",
@@ -759,7 +890,7 @@ public class Assignment3Tasks {
             $setWindowFields: {
                 partitionBy: "$activity_id",
                 sortBy: {
-                    "dateDays": 1
+                    "_id": 1
                 },
                 output: {
                     altitude_shift: {
@@ -812,7 +943,15 @@ public class Assignment3Tasks {
             $sort: {
                 usr_gain: -1
             }
-        }, {
+        },
+        {
+            $addFields: {
+                usr_gain_m: {
+                    $multiply: ["$usr_gain", 0.3048]
+                }
+            }
+        },
+        {
             $limit: 20
         }
         */
