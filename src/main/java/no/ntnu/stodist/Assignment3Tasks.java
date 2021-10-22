@@ -11,6 +11,8 @@ import no.ntnu.stodist.simpleTable.Column;
 import no.ntnu.stodist.simpleTable.SimpleTable;
 import org.bson.Document;
 
+import java.time.Instant;
+import java.time.temporal.ValueRange;
 import java.util.*;
 
 import org.bson.BsonNull;
@@ -18,6 +20,9 @@ import org.bson.BsonNull;
 import java.io.File;
 import java.io.IOException;
 import java.sql.*;
+import java.util.Date;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static java.util.OptionalInt.empty;
 
@@ -168,45 +173,42 @@ public class Assignment3Tasks {
 
         MongoDB query in JSON format:
 
-        {
-            $addFields: {
-                days_over: {
+        [{$addFields: {
+days_over: {
                     $dateDiff:{
                         startDate: "$startDateTime",
                         endDate: "$endDateTime",
                         unit: "day"
                     }
                 }
-            }
-        },
-        {
-            $match: {
-                days_over: {$gte: 0}
-            }
-        },
-        {
-            $count: "days_over"
-        }
+
+  }}, {$match: {
+  days_over: {$eq: 1}
+}}, {$group: {
+  _id: "$user_id",
+}}, {$count: 'count'}]
 
         */
 
         List<Document> agr = Arrays.asList(new Document("$addFields",
-                                             new Document("days_over",
-                                                          new Document("$dateDiff",
-                                                                       new Document("startDate", "$startDateTime")
-                                                                               .append("endDate", "$endDateTime")
-                                                                               .append("unit", "day")))),
-                                new Document("$match",
-                                             new Document("days_over",
-                                                          new Document("$eq", 1L))),
-                                new Document("$count", "days_over"));
+                                                        new Document("days_over",
+                                                                     new Document("$dateDiff",
+                                                                                  new Document("startDate", "$startDateTime")
+                                                                                          .append("endDate", "$endDateTime")
+                                                                                          .append("unit", "day")))),
+                                           new Document("$match",
+                                                        new Document("days_over",
+                                                                     new Document("$eq", 1L))),
+                                           new Document("$group",
+                                                        new Document("_id", "$user_id")),
+                                           new Document("$count", "count"));
 
         Iterator<Document> documents = activityCollection.aggregate(agr).iterator();
         SimpleTable<Document> simpleTable = new SimpleTable<>();
         simpleTable.setTitle("Task 4");
         simpleTable.setItems(documents);
         simpleTable.setCols(
-                new Column<Document>("activity's passing midnight",document -> document.getInteger("days_over"))
+                new Column<Document>("activity's passing midnight",document -> document.getInteger("count"))
         );
         simpleTable.display();
     }
@@ -278,7 +280,8 @@ public class Assignment3Tasks {
     public static void task6(MongoDatabase db) {
         /*
         
-        The $geoNear operator could have have been used, but due to issues with the MongoDB JAVA 
+        The $geoNear operator could have been used, but the implementation is limited and would have required a
+        restructuring of the storage format.
         implementation, we could not use it.
 
         MongoDB query in JSON format:
@@ -302,28 +305,41 @@ public class Assignment3Tasks {
             }
         }
 
+        [{$match: {
+  _id: {$in: [1,32,11,9,200000]}
+}}, {$lookup: {
+  from: 'activity',
+  localField: 'activity_id',
+  foreignField: '_id',
+  as: 'activity_obj'
+}}, {$unwind: {
+  path: "$activity_obj"
+}}, {$group: {
+  _id: "$activity_obj.user_id",
+}}]
+
         */
 
         MongoCollection<Document> activityCollection = db.getCollection(Activity.collection);
         MongoCollection<Document> trackPointCollection = db.getCollection(TrackPoint.collection);
 
-        /*
 
-        *** Not needed apparently ***
+
 
         List<Document> agr = Arrays.asList(new Document("$addFields",
                                             new Document("seconds_dif",
                                                          new Document("$abs",
                                                                       new Document("$dateDiff",
-                                                                                   new Document("startDate", Date.from(Instant.parse("2008-08-24T15:38:00Z")))
+                                                                                   new Document("startDate", Date.from(
+                                                                                           Instant.parse("2008-08-24T15:38:00Z")))
                                                                                            .append("endDate", "$dateTime")
                                                                                            .append("unit", "second"))))),
                                new Document("$match",
                                             new Document("seconds_dif",
                                                          new Document("$lte", 60L))));
-        */
 
-        Iterator<Document> itr = trackPointCollection.find().iterator();
+
+        Iterator<Document> itr = trackPointCollection.aggregate(agr).iterator();
         ArrayList<Document> tpDocuments = new ArrayList<>();
 
         itr.forEachRemaining(tpDocuments::add);
@@ -341,6 +357,7 @@ public class Assignment3Tasks {
                 return empty();
             }
         }).filter(OptionalInt::isPresent).map(OptionalInt::getAsInt).distinct().toList();
+
 
 
         var infectedUsersFilter = Arrays.asList(new Document("$match",
@@ -367,13 +384,6 @@ public class Assignment3Tasks {
         MongoCollection<Document> activityCollection = db.getCollection(Activity.collection);
         MongoCollection<Document> userCollection = db.getCollection(User.collection);
 
-        /*
-
-        MongoDB query in JSON format:
-
-        MISSING
-
-        */
 
         List<Document> agr = Arrays.asList(new Document("$match",
                         new Document("transportationMode",
@@ -395,8 +405,8 @@ public class Assignment3Tasks {
 
         var user_query = Arrays.asList(new Document("$match",
                 new Document("_id",
-                        new Document("$nin", user_ids))),
-                new Document("$count", "num_users"));
+                        new Document("$nin", user_ids))));
+
 
         var taxi_haters = userCollection.aggregate(user_query).iterator();
 
@@ -405,30 +415,43 @@ public class Assignment3Tasks {
         simpleTable.setTitle("Task 7");
         simpleTable.setItems(taxi_haters);
         simpleTable.setCols(
-                new Column<Document>("non taxi users",document -> document.getInteger("num_users"))
+                new Column<Document>("non taxi users",document -> document.getInteger("_id"))
         );
         simpleTable.display();
+
     }
 
     public static void task8(MongoDatabase db) {
         MongoCollection<Document> activityCollection = db.getCollection(Activity.collection);
 
-        List<Document> agr = Arrays.asList(
-                                new Document("$match",
-                                            new Document("transportationMode",
-                                                    new Document("$ne", new BsonNull()))),
-                                new Document("$group",
-                                             new Document("_id",
-                                                          new Document("transportationMode", "$transportationMode")
-                                                                  .append("user_id", "$user_id"))
-                                                     .append("cnt",
-                                                             new Document("$count",
-                                                                          new Document()))),
-                                new Document("$group",
-                                             new Document("_id", "$_id.transportationMode")
-                                                     .append("cnt",
-                                                             new Document("$count",
-                                                                          new Document()))));
+//        List<Document> agr = Arrays.asList(
+//                                new Document("$match",
+//                                            new Document("transportationMode",
+//                                                    new Document("$ne", new BsonNull()))),
+//                                new Document("$group",
+//                                             new Document("_id",
+//                                                          new Document("transportationMode", "$transportationMode")
+//                                                                  .append("user_id", "$user_id"))
+//                                                     .append("cnt",
+//                                                             new Document("$count",
+//                                                                          new Document()))),
+//                                new Document("$group",
+//                                             new Document("_id", "$_id.transportationMode")
+//                                                     .append("cnt",
+//                                                             new Document("$count",
+//                                                                          new Document()))));
+        List<Document> agr = Arrays.asList(new Document("$group",
+                                                        new Document("_id",
+                                                                     new Document("transportationMode", "$transportationMode")
+                                                                             .append("user_id", "$user_id"))
+                                                                .append("cnt",
+                                                                        new Document("$count",
+                                                                                     new Document()))),
+                                           new Document("$group",
+                                                        new Document("_id", "$_id.transportationMode")
+                                                                .append("cnt",
+                                                                        new Document("$count",
+                                                                                     new Document()))));
 
         Iterator<Document> documents = activityCollection.aggregate(agr).iterator();
 
@@ -504,7 +527,7 @@ public class Assignment3Tasks {
         /*
 
         MongoDB query in JSON format:
-
+        [
         {
             '$group': {
                 '_id': {
@@ -562,37 +585,27 @@ public class Assignment3Tasks {
         }, {
             '$limit': 3
         }
+        ]
 
         */
 
-        List<Document> agr = Arrays.asList(new Document("$group", 
-                                new Document("_id", 
-                                new Document("year", 
-                                new Document("$year", "$startDateTime"))
-                                            .append("month", 
-                                new Document("$month", "$startDateTime")))
-                                        .append("count", 
-                                new Document("$sum", 1L))
-                                        .append("user_ids", 
-                                new Document("$push", 
-                                new Document("user_id", "$user_id")
-                                                .append("hours", 
-                                new Document("$divide", Arrays.asList(new Document("$subtract", Arrays.asList("$endDateTime", "$startDateTime")), 60L * 1000L * 60L)))))), 
-                                new Document("$sort", 
-                                new Document("count", -1L)), 
-                                new Document("$limit", 1L), 
-                                new Document("$unwind", 
-                                new Document("path", "$user_ids")), 
-                                new Document("$group", 
-                                new Document("_id", 
-                                new Document("user_id", "$user_ids.user_id"))
-                                        .append("total_hours", 
-                                new Document("$sum", "$user_ids.hours"))
-                                        .append("num_activities", 
-                                new Document("$sum", 1L))), 
-                                new Document("$sort", 
-                                new Document("num_activities", -1L)), 
-                                new Document("$limit", 3L));
+        List<Document> agr = Arrays.asList(new Document("$match",
+                                                        new Document("$and", Arrays.asList(new Document("$expr",
+                                                                                                        new Document("$eq", Arrays.asList(new Document("$year", "$startDateTime"), 2008L))),
+                                                                                           new Document("$expr",
+                                                                                                        new Document("$eq", Arrays.asList(new Document("$month", "$startDateTime"), 11L)))))),
+                                           new Document("$addFields",
+                                                        new Document("time_d",
+                                                                     new Document("$divide", Arrays.asList(new Document("$subtract", Arrays.asList("$endDateTime", "$startDateTime")), 60L * 1000L * 60L)))),
+                                           new Document("$group",
+                                                        new Document("_id", "$user_id")
+                                                                .append("total_hours",
+                                                                        new Document("$sum", "$time_d"))
+                                                                .append("num_activities",
+                                                                        new Document("$sum", 1L))),
+                                           new Document("$sort",
+                                                        new Document("num_activities", -1L)),
+                                           new Document("$limit", 2L));
 
         Iterator<Document> documents = activityCollection.aggregate(agr).iterator();
         SimpleTable<Document> simpleTable = new SimpleTable<>();
@@ -717,7 +730,7 @@ public class Assignment3Tasks {
             last_lon = d.getDouble("longitude");
             last_lat = d.getDouble("latitude");
         }
-        System.out.println("Task 10");
+        System.out.println("################# Task 10 ################");
         System.out.println("Total distance walked by user 112 in 2008:");
         System.out.printf("%.5f km\n", tot_dist);
     }
@@ -847,7 +860,7 @@ public class Assignment3Tasks {
         /*
 
         MongoDB query in JSON format:
-
+        [
         {
             $setWindowFields: {
                 partitionBy: "$activity_id",
@@ -913,6 +926,7 @@ public class Assignment3Tasks {
                     num_invalid: -1
             }
         }
+        ]
 
         */
 
