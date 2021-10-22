@@ -1,10 +1,7 @@
 package no.ntnu.stodist;
 
-import com.mongodb.DB;
 import com.mongodb.client.MongoDatabase;
 import no.ntnu.stodist.database.MongoConnection;
-
-import java.sql.Connection;
 
 public class main {
 

@@ -1,6 +1,5 @@
 package no.ntnu.stodist;
 
-
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.AggregateIterable;
@@ -12,7 +11,6 @@ import no.ntnu.stodist.simpleTable.SimpleTable;
 import org.bson.Document;
 
 import java.time.Instant;
-import java.time.temporal.ValueRange;
 import java.util.*;
 
 import org.bson.BsonNull;
@@ -21,8 +19,6 @@ import java.io.File;
 import java.io.IOException;
 import java.sql.*;
 import java.util.Date;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import static java.util.OptionalInt.empty;
 
@@ -173,8 +169,9 @@ public class Assignment3Tasks {
 
         MongoDB query in JSON format:
 
-        [{$addFields: {
-days_over: {
+        {
+            $addFields: {
+                days_over: {
                     $dateDiff:{
                         startDate: "$startDateTime",
                         endDate: "$endDateTime",
@@ -182,11 +179,19 @@ days_over: {
                     }
                 }
 
-  }}, {$match: {
-  days_over: {$eq: 1}
-}}, {$group: {
-  _id: "$user_id",
-}}, {$count: 'count'}]
+            }}, 
+            {
+                $match: {
+                    days_over: {$eq: 1}
+            }}, 
+            {
+                $group: {
+            _   id: "$user_id",
+            }}, 
+            {
+                $count: 'count'
+            }
+        }
 
         */
 
@@ -282,7 +287,6 @@ days_over: {
         
         The $geoNear operator could have been used, but the implementation is limited and would have required a
         restructuring of the storage format.
-        implementation, we could not use it.
 
         MongoDB query in JSON format:
 
@@ -322,9 +326,6 @@ days_over: {
 
         MongoCollection<Document> activityCollection = db.getCollection(Activity.collection);
         MongoCollection<Document> trackPointCollection = db.getCollection(TrackPoint.collection);
-
-
-
 
         List<Document> agr = Arrays.asList(new Document("$addFields",
                                             new Document("seconds_dif",
@@ -871,7 +872,7 @@ days_over: {
         /*
 
         MongoDB query in JSON format:
-        [
+        
         {
             $setWindowFields: {
                 partitionBy: "$activity_id",
@@ -937,7 +938,6 @@ days_over: {
                     num_invalid: -1
             }
         }
-        ]
 
         */
 
