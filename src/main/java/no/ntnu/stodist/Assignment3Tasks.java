@@ -589,23 +589,34 @@ days_over: {
 
         */
 
-        List<Document> agr = Arrays.asList(new Document("$match",
-                                                        new Document("$and", Arrays.asList(new Document("$expr",
-                                                                                                        new Document("$eq", Arrays.asList(new Document("$year", "$startDateTime"), 2008L))),
-                                                                                           new Document("$expr",
-                                                                                                        new Document("$eq", Arrays.asList(new Document("$month", "$startDateTime"), 11L)))))),
-                                           new Document("$addFields",
-                                                        new Document("time_d",
-                                                                     new Document("$divide", Arrays.asList(new Document("$subtract", Arrays.asList("$endDateTime", "$startDateTime")), 60L * 1000L * 60L)))),
-                                           new Document("$group",
-                                                        new Document("_id", "$user_id")
-                                                                .append("total_hours",
-                                                                        new Document("$sum", "$time_d"))
-                                                                .append("num_activities",
-                                                                        new Document("$sum", 1L))),
-                                           new Document("$sort",
-                                                        new Document("num_activities", -1L)),
-                                           new Document("$limit", 2L));
+        List<Document> agr = Arrays.asList(new Document("$group",
+                                new Document("_id",
+                                new Document("year",
+                                new Document("$year", "$startDateTime"))
+                                            .append("month",
+                                new Document("$month", "$startDateTime")))
+                                        .append("count",
+                                new Document("$sum", 1L))
+                                        .append("user_ids",
+                                new Document("$push",
+                                new Document("user_id", "$user_id")
+                                                .append("hours",
+                                new Document("$divide", Arrays.asList(new Document("$subtract", Arrays.asList("$endDateTime", "$startDateTime")), 60L * 1000L * 60L)))))),
+                                new Document("$sort",
+                                new Document("count", -1L)),
+                                new Document("$limit", 1L),
+                                new Document("$unwind",
+                                new Document("path", "$user_ids")),
+                                new Document("$group",
+                                new Document("_id",
+                                new Document("user_id", "$user_ids.user_id"))
+                                        .append("total_hours",
+                                new Document("$sum", "$user_ids.hours"))
+                                        .append("num_activities",
+                                new Document("$sum", 1L))),
+                                new Document("$sort",
+                                new Document("num_activities", -1L)),
+                                new Document("$limit", 3L));
 
         Iterator<Document> documents = activityCollection.aggregate(agr).iterator();
         SimpleTable<Document> simpleTable = new SimpleTable<>();
